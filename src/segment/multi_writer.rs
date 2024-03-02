@@ -44,7 +44,7 @@ impl MultiWriter {
     /// This can be used to index an item into an external `Index`.
     #[must_use]
     pub fn offset(&self, key: &[u8]) -> u64 {
-        self.get_active_writer().offset() 
+        self.get_active_writer().offset()
         // NOTE: Point to the value record, not the key
         // The key is not really needed when dereferencing a value handle
         + std::mem::size_of::<u16>() as u64 + key.len() as u64
