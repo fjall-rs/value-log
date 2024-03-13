@@ -114,7 +114,7 @@ impl ValueLog {
 
     pub(crate) fn recover<P: Into<PathBuf>>(
         path: P,
-        index: Arc<dyn Index + Send + Sync>,
+        _index: Arc<dyn Index + Send + Sync>,
     ) -> crate::Result<()> {
         let path = path.into();
         log::info!("Recovering value-log at {}", path.display());
@@ -238,7 +238,7 @@ impl ValueLog {
     pub fn rollover<W: IndexWriter + Send + Sync>(
         &self,
         ids: &[Arc<str>],
-        index_writer: W,
+        index_writer: &W,
     ) -> crate::Result<()> {
         // IMPORTANT: Only allow 1 rollover at any given time
         let _guard = self.semaphore.lock().expect("lock is poisoned");
@@ -252,40 +252,42 @@ impl ValueLog {
 
         drop(lock);
 
-        if let Some(segments) = segments {
-            let readers = segments
-                .into_iter()
-                .map(|x| SegmentReader::new(&x.path, x.id.clone()))
-                .collect::<std::io::Result<Vec<_>>>()?;
+        let Some(segments) = segments else {
+            return Ok(());
+        };
 
-            let reader = MergeReader::new(readers);
+        let readers = segments
+            .into_iter()
+            .map(|x| SegmentReader::new(&x.path, x.id.clone()))
+            .collect::<std::io::Result<Vec<_>>>()?;
 
-            let mut writer = self.get_writer()?;
+        let reader = MergeReader::new(readers);
 
-            for item in reader {
-                let (k, v, _) = item?;
-                eprintln!("{k:?} => {:?}", String::from_utf8_lossy(&v));
+        let mut writer = self.get_writer()?;
 
-                let segment_id = writer.segment_id();
-                let offset = writer.offset(&k);
+        for item in reader {
+            let (k, v, _) = item?;
+            eprintln!("{k:?} => {:?}", String::from_utf8_lossy(&v));
 
-                log::trace!(
-                    "GC: inserting indirection: {segment_id:?}:{offset:?} => {:?}",
-                    String::from_utf8_lossy(&k)
-                );
+            let segment_id = writer.segment_id();
+            let offset = writer.offset(&k);
 
-                index_writer.insert_indirection(&k, ValueHandle { segment_id, offset })?;
-                writer.write(&k, &v)?;
-            }
+            log::trace!(
+                "GC: inserting indirection: {segment_id:?}:{offset:?} => {:?}",
+                String::from_utf8_lossy(&k)
+            );
 
-            self.register(writer)?;
-            index_writer.finish()?;
+            index_writer.insert_indirection(&k, ValueHandle { segment_id, offset })?;
+            writer.write(&k, &v)?;
+        }
 
-            let mut lock = self.segments.write().expect("lock is poisoned");
-            for id in ids {
-                std::fs::remove_dir_all(self.path.join("segments").join(&**id))?;
-                lock.remove(id);
-            }
+        self.register(writer)?;
+        index_writer.finish()?;
+
+        let mut lock = self.segments.write().expect("lock is poisoned");
+        for id in ids {
+            std::fs::remove_dir_all(self.path.join("segments").join(&**id))?;
+            lock.remove(id);
         }
 
         Ok(())

@@ -3,7 +3,7 @@ use std::{
     path::Path,
     sync::{Arc, RwLock},
 };
-use value_log::{Config, Index, IndexWriter, SegmentReader, ValueHandle, ValueLog};
+use value_log::{Config, Index, IndexWriter, ValueHandle, ValueLog};
 
 #[derive(Default)]
 pub struct DebugIndex(RwLock<BTreeMap<Arc<[u8]>, ValueHandle>>);
@@ -19,13 +19,6 @@ impl Index for DebugIndex {
             .expect("lock is poisoned")
             .insert(key.into(), value);
 
-        Ok(())
-    }
-}
-
-impl DebugIndex {
-    fn remove(&self, key: &[u8]) -> std::io::Result<()> {
-        self.0.write().expect("lock is poisoned").remove(key);
         Ok(())
     }
 }

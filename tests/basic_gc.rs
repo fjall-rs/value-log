@@ -139,7 +139,7 @@ fn basic_kv() -> value_log::Result<()> {
         assert_eq!(item, key.repeat(1_000).into());
     }
 
-    value_log.rollover(&value_log.list_segments(), DebugIndexWriter(index.clone()))?;
+    value_log.rollover(&value_log.list_segments(), &DebugIndexWriter(index.clone()))?;
 
     {
         let lock = value_log.segments.read().unwrap();

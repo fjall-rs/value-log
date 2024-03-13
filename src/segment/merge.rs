@@ -33,6 +33,7 @@ impl Ord for IteratorValue {
     }
 }
 
+#[allow(clippy::module_name_repetitions)]
 pub struct MergeReader {
     readers: Vec<SegmentReader>,
     heap: MinMaxHeap<IteratorValue>,
