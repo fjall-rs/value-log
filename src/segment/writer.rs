@@ -80,16 +80,19 @@ impl Writer {
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    pub fn write(&mut self, key: &[u8], value: &[u8]) -> std::io::Result<()> {
+    pub fn write(&mut self, key: &[u8], value: &[u8]) -> std::io::Result<u32> {
+        #[cfg(feature = "compression")]
+        let value = lz4_flex::compress_prepend_size(value);
+
         let mut hasher = crc32fast::Hasher::new();
-        hasher.update(value);
+        hasher.update(&value);
         let crc = hasher.finalize();
 
         self.inner.write_u16::<BigEndian>(key.len() as u16)?;
         self.inner.write_all(key)?;
         self.inner.write_u32::<BigEndian>(crc)?;
         self.inner.write_u32::<BigEndian>(value.len() as u32)?;
-        self.inner.write_all(value)?;
+        self.inner.write_all(&value)?;
 
         // Key
         self.offset += std::mem::size_of::<u16>() as u64;
@@ -98,15 +101,13 @@ impl Writer {
         // CRC
         self.offset += std::mem::size_of::<u32>() as u64;
 
-        // TODO: compress
-
         // Value
         self.offset += std::mem::size_of::<u32>() as u64;
         self.offset += value.len() as u64;
 
         self.item_count += 1;
 
-        Ok(())
+        Ok(value.len() as u32)
     }
 
     pub(crate) fn flush(&mut self) -> std::io::Result<()> {

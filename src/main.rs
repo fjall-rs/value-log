@@ -69,6 +69,50 @@ fn main() -> value_log::Result<()> {
         value_log.register(writer)?;
     }
 
+    {
+        let mut writer = value_log.get_writer()?;
+        let segment_id = writer.segment_id();
+
+        let key = "html";
+        let offset = writer.offset(key.as_bytes());
+
+        index.insert_indirection(
+            key.as_bytes(),
+            ValueHandle {
+                offset,
+                segment_id: segment_id.clone(),
+            },
+        )?;
+
+        writer.write(
+            key.as_bytes(),
+            b"
+        <html>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-0\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-1\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-2\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-3\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-4\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-5\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-6\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-7\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-8\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-9\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-10\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-11\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-12\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-13\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-14\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-15\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-16\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-17\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-18\">Hello <i>World</i></div>
+        </html>",
+        )?;
+
+        value_log.register(writer)?;
+    }
+
     /* {
         let mut writer = value_log.get_writer()?;
         let segment_id = writer.segment_id();
@@ -198,6 +242,12 @@ fn main() -> value_log::Result<()> {
     value_log.rollover(&value_log.list_segments(), DebugIndexWriter(index.clone()))?; */
 
     eprintln!("{:#?}", value_log.segments.read().unwrap());
+
+    let handle = index.get(b"html")?.unwrap();
+    eprintln!(
+        "{}",
+        String::from_utf8_lossy(&value_log.get(&handle)?.unwrap())
+    );
 
     for _ in 0..10 {
         let value_handle = ValueHandle {

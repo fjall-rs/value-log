@@ -1,6 +1,6 @@
 //! Generic value log implementation for key-value separated storage.
 //!
-//! > This crate is intended for key-value separated LSM storage.
+//! > This crate is intended as a building block for key-value separated LSM storage.
 //! > You probably want to use <https://github.com/fjall-rs/fjall> instead.
 //!
 //! The value log's contents are split into segments, each segment holds a sorted
@@ -49,6 +49,7 @@ mod value_log;
 mod version;
 
 pub use {
+    blob_cache::BlobCache,
     config::Config,
     error::{Error, Result},
     handle::ValueHandle,

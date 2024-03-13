@@ -157,16 +157,19 @@ impl ValueLog {
         let mut reader = BufReader::new(File::open(&segment.path)?);
         reader.seek(std::io::SeekFrom::Start(handle.offset))?;
 
-        // TODO: handle CRC
         let _crc = reader.read_u32::<BigEndian>()?;
 
         let val_len = reader.read_u32::<BigEndian>()?;
 
         let mut val = vec![0; val_len as usize];
         reader.read_exact(&mut val)?;
-        let val: Arc<[u8]> = val.into();
 
-        // TODO: decompress
+        #[cfg(feature = "compression")]
+        let val = lz4_flex::decompress_size_prepended(&val).expect("should decompress");
+
+        // TODO: handle CRC
+
+        let val: Arc<[u8]> = val.into();
 
         self.blob_cache.insert(handle.clone(), val.clone());
 

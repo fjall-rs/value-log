@@ -78,18 +78,18 @@ impl MultiWriter {
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    pub fn write(&mut self, key: &[u8], value: &[u8]) -> crate::Result<()> {
+    pub fn write(&mut self, key: &[u8], value: &[u8]) -> crate::Result<u32> {
         let target_size = self.target_size;
 
         let writer = self.get_active_writer_mut();
-        writer.write(key, value)?;
+        let bytes_written = writer.write(key, value)?;
 
         if writer.offset() >= target_size {
             writer.flush()?;
             self.rotate()?;
         }
 
-        Ok(())
+        Ok(bytes_written)
     }
 
     pub(crate) fn finish(mut self) -> crate::Result<Vec<Writer>> {

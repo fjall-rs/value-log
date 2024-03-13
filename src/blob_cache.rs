@@ -41,12 +41,18 @@ impl BlobCache {
         }
     }
 
-    pub fn insert(&self, handle: CacheKey, value: Arc<[u8]>) {
-        self.data.insert(handle, value);
+    pub(crate) fn insert(&self, handle: CacheKey, value: Arc<[u8]>) {
+        if self.capacity > 0 {
+            self.data.insert(handle, value);
+        }
     }
 
-    pub fn get(&self, handle: &CacheKey) -> Option<Item> {
-        self.data.get(handle)
+    pub(crate) fn get(&self, handle: &CacheKey) -> Option<Item> {
+        if self.capacity > 0 {
+            self.data.get(handle)
+        } else {
+            None
+        }
     }
 
     /// Returns the cache capacity in bytes
