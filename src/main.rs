@@ -251,7 +251,7 @@ fn main() -> value_log::Result<()> {
 
     for _ in 0..10 {
         let value_handle = ValueHandle {
-            segment_id: value_log.list_segments().first().unwrap().clone(),
+            segment_id: value_log.list_segment_ids().first().unwrap().clone(),
             offset: 3,
         };
 

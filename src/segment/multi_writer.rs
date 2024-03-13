@@ -7,7 +7,7 @@ use std::{
 
 /// Segment writer, may write multiple segments
 pub struct MultiWriter {
-    folder: PathBuf,
+    root_folder: PathBuf,
     target_size: u64,
     writers: Vec<Writer>,
 }
@@ -22,12 +22,10 @@ impl MultiWriter {
     pub fn new<P: AsRef<Path>>(target_size: u64, folder: P) -> std::io::Result<Self> {
         let folder = folder.as_ref();
         let segment_id = generate_segment_id();
-
-        let segment_folder = folder.join("segments").join(&*segment_id);
-        let path = segment_folder.join("data");
+        let path = folder.join("segments").join(&*segment_id).join("data");
 
         Ok(Self {
-            folder: folder.into(),
+            root_folder: folder.into(),
             target_size,
             writers: vec![Writer::new(segment_id, path)?],
         })
@@ -63,11 +61,13 @@ impl MultiWriter {
         log::debug!("Rotating segment writer");
 
         let new_segment_id = generate_segment_id();
+
         let path = self
-            .folder
+            .root_folder
             .join("segments")
             .join(&*new_segment_id)
             .join("data");
+
         self.writers.push(Writer::new(new_segment_id, path)?);
 
         Ok(())

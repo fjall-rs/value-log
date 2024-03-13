@@ -2,6 +2,7 @@ use std::{
     collections::BTreeMap,
     sync::{Arc, RwLock},
 };
+use test_log::test;
 use value_log::{Config, Index, ValueHandle, ValueLog};
 
 type Inner = RwLock<BTreeMap<Arc<[u8]>, ValueHandle>>;
@@ -69,15 +70,10 @@ fn basic_kv() -> value_log::Result<()> {
     {
         let lock = value_log.segments.read().unwrap();
         assert_eq!(1, lock.len());
-        assert_eq!(items.len() as u64, lock.values().next().unwrap().item_count);
-        assert_eq!(
-            0,
-            lock.values()
-                .next()
-                .unwrap()
-                .stale_values
-                .load(std::sync::atomic::Ordering::Relaxed),
-        );
+
+        let segment = lock.values().next().unwrap();
+        assert_eq!(items.len() as u64, segment.len());
+        assert_eq!(0, segment.stats.get_dead_items());
     }
 
     for (key, handle) in index.0.read().unwrap().iter() {

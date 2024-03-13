@@ -1,10 +1,10 @@
+use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 use std::sync::Arc;
 
 /// A value handle points into the value log.
 #[allow(clippy::module_name_repetitions)]
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct ValueHandle {
     /// Segment ID
     pub segment_id: Arc<str>,

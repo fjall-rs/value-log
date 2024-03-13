@@ -1,7 +1,7 @@
 use crate::{
     blob_cache::BlobCache,
     index::Writer as IndexWriter,
-    segment::{merge::MergeReader, multi_writer::MultiWriter},
+    segment::{merge::MergeReader, multi_writer::MultiWriter, stats::Stats},
     version::Version,
     Config, Index, Segment, SegmentReader, SegmentWriter, ValueHandle,
 };
@@ -101,13 +101,34 @@ impl ValueLog {
         })))
     }
 
+    /// Gets a segment
+    #[must_use]
+    pub fn get_segment(&self, id: &Arc<str>) -> Option<Arc<Segment>> {
+        self.segments
+            .read()
+            .expect("lock is poisoned")
+            .get(id)
+            .cloned()
+    }
+
     /// Lists all segment IDs
     #[must_use]
-    pub fn list_segments(&self) -> Vec<Arc<str>> {
+    pub fn list_segment_ids(&self) -> Vec<Arc<str>> {
         self.segments
             .read()
             .expect("lock is poisoned")
             .keys()
+            .cloned()
+            .collect()
+    }
+
+    /// Lists all segments
+    #[must_use]
+    pub fn list_segments(&self) -> Vec<Arc<Segment>> {
+        self.segments
+            .read()
+            .expect("lock is poisoned")
+            .values()
             .cloned()
             .collect()
     }
@@ -154,7 +175,7 @@ impl ValueLog {
             return Ok(Some(value));
         }
 
-        let mut reader = BufReader::new(File::open(&segment.path)?);
+        let mut reader = BufReader::new(File::open(segment.path.join("data"))?);
         reader.seek(std::io::SeekFrom::Start(handle.offset))?;
 
         let _crc = reader.read_u32::<BigEndian>()?;
@@ -164,7 +185,7 @@ impl ValueLog {
         let mut val = vec![0; val_len as usize];
         reader.read_exact(&mut val)?;
 
-        #[cfg(feature = "compression")]
+        #[cfg(feature = "lz4")]
         let val = lz4_flex::decompress_size_prepended(&val).expect("should decompress");
 
         // TODO: handle CRC
@@ -182,14 +203,6 @@ impl ValueLog {
     ) -> crate::Result<Vec<Option<Vec<u8>>>> {
         handles.iter().map(|vr| self.get(vr)).collect()
     } */
-
-    /// Sets the eligible-for-GC item count for a specific segment
-    pub fn set_stale_items(&self, id: &str, cnt: u64) {
-        if let Some(item) = self.segments.read().expect("lock is poisoned").get(id) {
-            item.stale_values
-                .store(cnt, std::sync::atomic::Ordering::Release);
-        };
-    }
 
     /// Initializes a new segment writer
     ///
@@ -215,19 +228,145 @@ impl ValueLog {
 
         for writer in writers {
             let segment_id = writer.segment_id.clone();
-            let path = writer.path.clone();
-            let item_count = writer.item_count;
+            let segment_folder = writer.folder.clone();
 
             lock.insert(
                 segment_id.clone(),
                 Arc::new(Segment {
                     id: segment_id,
-                    path,
-                    item_count,
-                    stale_values: AtomicU64::default(),
+                    path: segment_folder,
+                    stats: Stats {
+                        item_count: writer.item_count,
+                        total_bytes: writer.written_blob_bytes,
+                        dead_items: AtomicU64::default(),
+                        dead_bytes: AtomicU64::default(),
+                    },
                 }),
             );
         }
+
+        Ok(())
+    }
+
+    /// Returns the amount of bytes that can be freed on disk
+    /// if all segments were to be defragmented
+    ///
+    /// This value may not be fresh, as it is only set after running [`ValueLog::refresh_stats`].
+    #[must_use]
+    pub fn reclaimable_bytes(&self) -> u64 {
+        let segments = self.segments.read().expect("lock is poisoned");
+
+        let dead_bytes = segments
+            .values()
+            .map(|x| x.stats.get_dead_bytes())
+            .sum::<u64>();
+        drop(segments);
+
+        dead_bytes
+    }
+
+    /// Returns the percent of dead bytes in the value log
+    ///
+    /// This value may not be fresh, as it is only set after running [`ValueLog::refresh_stats`].
+    #[must_use]
+    pub fn dead_ratio(&self) -> f32 {
+        let segments = self.segments.read().expect("lock is poisoned");
+
+        let used_bytes = segments.values().map(|x| x.stats.total_bytes).sum::<u64>();
+        if used_bytes == 0 {
+            return 0.0;
+        }
+
+        let dead_bytes = segments
+            .values()
+            .map(|x| x.stats.get_dead_bytes())
+            .sum::<u64>();
+        if dead_bytes == 0 {
+            return 0.0;
+        }
+
+        drop(segments);
+
+        dead_bytes as f32 / used_bytes as f32
+    }
+
+    /// Returns the approximate space amplification
+    ///
+    /// Returns 0.0 if there are no items.
+    ///
+    /// This value may not be fresh, as it is only set after running [`ValueLog::refresh_stats`].
+    #[must_use]
+    pub fn space_amp(&self) -> f32 {
+        let segments = self.segments.read().expect("lock is poisoned");
+
+        let used_bytes = segments.values().map(|x| x.stats.total_bytes).sum::<u64>();
+        if used_bytes == 0 {
+            return 0.0;
+        }
+
+        let dead_bytes = segments
+            .values()
+            .map(|x| x.stats.get_dead_bytes())
+            .sum::<u64>();
+
+        drop(segments);
+
+        let alive_bytes = used_bytes - dead_bytes;
+        if alive_bytes == 0 {
+            return 0.0;
+        }
+
+        used_bytes as f32 / alive_bytes as f32
+    }
+
+    /// Scans through a segment, refreshing its statistics
+    ///
+    /// This function is blocking.
+    ///
+    /// # Errors
+    ///
+    /// Will return `Err` if an IO error occurs.
+    pub fn refresh_stats(&self, segment_id: &Arc<str>) -> std::io::Result<()> {
+        let Some(segment) = self
+            .segments
+            .read()
+            .expect("lock is poisoned")
+            .get(segment_id)
+            .cloned()
+        else {
+            return Ok(());
+        };
+
+        // Scan segment
+        let scanner = segment.scan()?;
+
+        let mut dead_items = 0;
+        let mut dead_bytes = 0;
+
+        for item in scanner {
+            let (key, val) = item?;
+
+            if let Some(item) = self.index.get(&key)? {
+                // NOTE: Segment IDs are monotonically increasing
+                if item.segment_id > *segment_id {
+                    dead_items += 1;
+                    dead_bytes += val.len() as u64;
+                }
+            } else {
+                dead_items += 1;
+                dead_bytes += val.len() as u64;
+            }
+        }
+
+        segment
+            .stats
+            .dead_items
+            .store(dead_items, std::sync::atomic::Ordering::Release);
+
+        segment
+            .stats
+            .dead_bytes
+            .store(dead_bytes, std::sync::atomic::Ordering::Release);
 
         Ok(())
     }
@@ -261,7 +400,7 @@ impl ValueLog {
 
         let readers = segments
             .into_iter()
-            .map(|x| SegmentReader::new(&x.path, x.id.clone()))
+            .map(|x| x.scan())
             .collect::<std::io::Result<Vec<_>>>()?;
 
         let reader = MergeReader::new(readers);

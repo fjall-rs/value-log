@@ -8,13 +8,15 @@ use std::{
 
 /// Segment writer
 pub struct Writer {
-    pub(crate) path: PathBuf,
+    pub(crate) folder: PathBuf,
     pub(crate) segment_id: Arc<str>,
 
     inner: BufWriter<File>,
 
     offset: u64,
     pub(crate) item_count: u64,
+
+    pub(crate) written_blob_bytes: u64,
 }
 
 impl Writer {
@@ -32,11 +34,12 @@ impl Writer {
         let file = File::create(path)?;
 
         Ok(Self {
-            path: path.to_owned(),
+            folder: folder.into(),
             segment_id,
             inner: BufWriter::new(file),
             offset: 0,
             item_count: 0,
+            written_blob_bytes: 0,
         })
     }
 
@@ -81,7 +84,7 @@ impl Writer {
     ///
     /// Will return `Err` if an IO error occurs.
     pub fn write(&mut self, key: &[u8], value: &[u8]) -> std::io::Result<u32> {
-        #[cfg(feature = "compression")]
+        #[cfg(feature = "lz4")]
         let value = lz4_flex::compress_prepend_size(value);
 
         let mut hasher = crc32fast::Hasher::new();
@@ -93,6 +96,8 @@ impl Writer {
         self.inner.write_u32::<BigEndian>(crc)?;
         self.inner.write_u32::<BigEndian>(value.len() as u32)?;
         self.inner.write_all(&value)?;
+
+        self.written_blob_bytes += value.len() as u64;
 
         // Key
         self.offset += std::mem::size_of::<u16>() as u64;

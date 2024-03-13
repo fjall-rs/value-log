@@ -19,9 +19,8 @@ name = "value_log"
 path = "src/lib.rs"
 
 [features]
-default = ["compression"]
-compression = ["dep:lz4_flex"]
-serde = ["dep:serde"]
+default = ["lz4"]
+lz4 = ["dep:lz4_flex"]
 
 [dependencies]
 byteorder = "1.5.0"
@@ -36,7 +35,8 @@ serde = { version = "1.0.197", default-features = false, features = [
   "alloc",
   "rc",
   "derive",
-], optional = true }
+] }
+serde_json = { version = "1.0.114" }
 
 [dev-dependencies]
 criterion = "0.5.1"
@@ -48,4 +48,4 @@ test-log = "0.2.15"
 name = "value_log"
 harness = false
 path = "benches/value_log.rs"
-required-features = ["compression"]
+required-features = ["lz4"]

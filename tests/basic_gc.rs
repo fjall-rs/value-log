@@ -2,6 +2,7 @@ use std::{
     collections::BTreeMap,
     sync::{Arc, RwLock},
 };
+use test_log::test;
 use value_log::{Config, Index, IndexWriter, ValueHandle, ValueLog};
 
 type Inner = RwLock<BTreeMap<Arc<[u8]>, ValueHandle>>;
@@ -43,7 +44,7 @@ impl IndexWriter for DebugIndexWriter {
 }
 
 #[test]
-fn basic_kv() -> value_log::Result<()> {
+fn basic_gc() -> value_log::Result<()> {
     let folder = tempfile::tempdir()?;
 
     let index = DebugIndex(RwLock::new(BTreeMap::<Arc<[u8]>, ValueHandle>::default()));
@@ -80,15 +81,8 @@ fn basic_kv() -> value_log::Result<()> {
     {
         let lock = value_log.segments.read().unwrap();
         assert_eq!(1, lock.len());
-        assert_eq!(5, lock.values().next().unwrap().item_count);
-        assert_eq!(
-            0,
-            lock.values()
-                .next()
-                .unwrap()
-                .stale_values
-                .load(std::sync::atomic::Ordering::Relaxed),
-        );
+        assert_eq!(5, lock.values().next().unwrap().len());
+        assert_eq!(0, lock.values().next().unwrap().stats.get_dead_items());
     }
 
     for (key, handle) in index.0.read().unwrap().iter() {
@@ -123,15 +117,8 @@ fn basic_kv() -> value_log::Result<()> {
     {
         let lock = value_log.segments.read().unwrap();
         assert_eq!(2, lock.len());
-        assert_eq!(5, lock.values().next().unwrap().item_count);
-        assert_eq!(
-            0,
-            lock.values()
-                .next()
-                .unwrap()
-                .stale_values
-                .load(std::sync::atomic::Ordering::Relaxed),
-        );
+        assert_eq!(5, lock.values().next().unwrap().len());
+        assert_eq!(0, lock.values().next().unwrap().stats.get_dead_items());
     }
 
     for (key, handle) in index.0.read().unwrap().iter() {
@@ -139,20 +126,16 @@ fn basic_kv() -> value_log::Result<()> {
         assert_eq!(item, key.repeat(1_000).into());
     }
 
-    value_log.rollover(&value_log.list_segments(), &DebugIndexWriter(index.clone()))?;
+    value_log.rollover(
+        &value_log.list_segment_ids(),
+        &DebugIndexWriter(index.clone()),
+    )?;
 
     {
         let lock = value_log.segments.read().unwrap();
         assert_eq!(1, lock.len());
-        assert_eq!(5, lock.values().next().unwrap().item_count);
-        assert_eq!(
-            0,
-            lock.values()
-                .next()
-                .unwrap()
-                .stale_values
-                .load(std::sync::atomic::Ordering::Relaxed),
-        );
+        assert_eq!(5, lock.values().next().unwrap().len());
+        assert_eq!(0, lock.values().next().unwrap().stats.get_dead_items());
     }
 
     Ok(())
