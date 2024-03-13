@@ -3,7 +3,7 @@ use std::{
     path::Path,
     sync::{Arc, RwLock},
 };
-use value_log::{Config, Index, SegmentReader, ValueHandle, ValueLog};
+use value_log::{Config, Index, IndexWriter, SegmentReader, ValueHandle, ValueLog};
 
 #[derive(Default)]
 pub struct DebugIndex(RwLock<BTreeMap<Arc<[u8]>, ValueHandle>>);
@@ -30,6 +30,18 @@ impl DebugIndex {
     }
 }
 
+struct DebugIndexWriter(Arc<DebugIndex>);
+
+impl IndexWriter for DebugIndexWriter {
+    fn insert_indirection(&self, key: &[u8], value: ValueHandle) -> std::io::Result<()> {
+        self.0.insert_indirection(key, value)
+    }
+
+    fn finish(&self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
 fn main() -> value_log::Result<()> {
     let index = DebugIndex(RwLock::new(BTreeMap::<Arc<[u8]>, ValueHandle>::default()));
     let index = Arc::new(index);
@@ -41,11 +53,7 @@ fn main() -> value_log::Result<()> {
     }
     std::fs::create_dir_all(vl_path)?;
 
-    let value_log = ValueLog::new(
-        vl_path,
-        Config::default().segment_size_bytes(100),
-        index.clone(),
-    )?;
+    let value_log = ValueLog::new(vl_path, Config::default(), index.clone())?;
 
     {
         let mut writer = value_log.get_writer()?;
@@ -68,7 +76,7 @@ fn main() -> value_log::Result<()> {
         value_log.register(writer)?;
     }
 
-    {
+    /* {
         let mut writer = value_log.get_writer()?;
         let segment_id = writer.segment_id();
 
@@ -131,7 +139,7 @@ fn main() -> value_log::Result<()> {
         value_log.register(writer)?;
     }
 
-    eprintln!("{:#?}", value_log.segments);
+    eprintln!("{:#?}", value_log.segments.read().unwrap());
 
     for (key, handle) in index.0.read().expect("lock is poisoned").iter() {
         eprintln!(
@@ -148,29 +156,12 @@ fn main() -> value_log::Result<()> {
         );
     }
 
-    /* eprintln!(
-        "multi: {:#?}",
-        value_log
-            .get_multiple(
-                &index
-                    .0
-                    .read()
-                    .expect("lock is poisoned")
-                    .values()
-                    .cloned()
-                    .collect::<Vec<_>>()
-            )?
-            .into_iter()
-            .filter(Option::is_some)
-            .count()
-    ); */
-
     index.remove("d".as_bytes())?;
 
     for segment_id in value_log.list_segments() {
         // Scan segment
         let reader = SegmentReader::new(
-            vl_path.join("segments").join(&*segment_id),
+            vl_path.join("segments").join(&*segment_id).join("data"),
             segment_id.clone(),
         )?;
 
@@ -211,9 +202,20 @@ fn main() -> value_log::Result<()> {
     }
 
     eprintln!("=== rollover ===");
-    value_log.rollover(&value_log.list_segments())?;
+    value_log.rollover(&value_log.list_segments(), DebugIndexWriter(index.clone()))?; */
 
-    eprintln!("{:#?}", value_log.segments);
+    eprintln!("{:#?}", value_log.segments.read().unwrap());
+
+    for _ in 0..10 {
+        let value_handle = ValueHandle {
+            segment_id: value_log.list_segments().first().unwrap().clone(),
+            offset: 3,
+        };
+
+        let before = std::time::Instant::now();
+        value_log.get(&value_handle)?;
+        eprintln!("blob loaded in {:?}ns", before.elapsed().as_nanos());
+    }
 
     Ok(())
 }

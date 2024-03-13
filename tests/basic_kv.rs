@@ -26,15 +26,9 @@ impl Index for DebugIndex {
         self.write()
             .expect("lock is poisoned")
             .insert(key.into(), value);
+
         Ok(())
     }
-}
-
-impl DebugIndex {
-    /*  fn remove(&self, key: &[u8]) -> std::io::Result<()> {
-        self.write().expect("lock is poisoned").remove(key);
-        Ok(())
-    } */
 }
 
 #[test]

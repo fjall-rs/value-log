@@ -38,6 +38,7 @@
 #![warn(clippy::expect_used)]
 #![allow(clippy::missing_const_for_fn)]
 
+mod blob_cache;
 mod config;
 mod error;
 mod handle;
@@ -51,7 +52,7 @@ pub use {
     config::Config,
     error::{Error, Result},
     handle::ValueHandle,
-    index::Index,
+    index::{Index, Writer as IndexWriter},
     segment::multi_writer::MultiWriter as SegmentWriter,
     segment::reader::Reader as SegmentReader,
     segment::Segment,

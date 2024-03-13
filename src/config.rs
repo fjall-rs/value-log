@@ -1,18 +1,33 @@
+use crate::blob_cache::BlobCache;
+use std::sync::Arc;
+
 /// Value log configuration
 #[derive(Debug)]
 pub struct Config {
     pub(crate) segment_size_bytes: u64,
+    pub(crate) blob_cache: Arc<BlobCache>,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             segment_size_bytes: 256 * 1_024 * 1_024,
+            blob_cache: Arc::new(BlobCache::with_capacity_bytes(16 * 1_024 * 1_024)),
         }
     }
 }
 
 impl Config {
+    /// Sets the blob cache.
+    ///
+    /// Defaults to a blob cache 16 MiB of capacity shared
+    /// between all partitions inside this keyspace.
+    #[must_use]
+    pub fn blob_cache(mut self, blob_cache: Arc<BlobCache>) -> Self {
+        self.blob_cache = blob_cache;
+        self
+    }
+
     /// Sets the maximum size of value log segments.
     ///
     /// This heavily influences space amplification, as

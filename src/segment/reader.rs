@@ -9,7 +9,6 @@ use std::{
 /// Reads through a segment in order.
 pub struct Reader {
     pub(crate) segment_id: Arc<str>,
-
     inner: BufReader<File>,
 }
 
@@ -47,6 +46,17 @@ impl Iterator for Reader {
         let mut key = vec![0; key_len.into()];
         if let Err(e) = self.inner.read_exact(&mut key) {
             return Some(Err(e));
+        };
+
+        // TODO: handle crc
+        let _crc = match self.inner.read_u32::<BigEndian>() {
+            Ok(v) => v,
+            Err(e) => {
+                if e.kind() == std::io::ErrorKind::UnexpectedEof {
+                    return None;
+                }
+                return Some(Err(e));
+            }
         };
 
         let val_len = match self.inner.read_u32::<BigEndian>() {

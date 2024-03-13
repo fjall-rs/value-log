@@ -18,12 +18,23 @@ categories = ["data-structures", "database-implementations", "algorithms"]
 name = "value_log"
 path = "src/lib.rs"
 
+[features]
+default = []
+serde = ["dep:serde"]
+
 [dependencies]
 byteorder = "1.5.0"
 chrono = "0.4.34"
+crc32fast = "1.4.0"
 log = "0.4.20"
 min-max-heap = "1.3.0"
+quick_cache = "0.4.1"
 rand = "0.8.5"
+serde = { version = "1.0.197", default-features = false, features = [
+  "alloc",
+  "rc",
+  "derive",
+], optional = true }
 
 [dev-dependencies]
 env_logger = "0.11.2"

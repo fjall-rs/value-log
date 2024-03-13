@@ -8,14 +8,12 @@ pub mod multi_writer;
 pub mod reader;
 pub mod writer;
 
-/* TODO: per blob CRC value */
-
 /// A disk segment is an immutable, sorted, contiguous file
 /// that contains key-value pairs.
 ///
 /// ### File format
 ///
-/// KV: \<key length: u16\> \<key: N\> \<value length: u32\> \<value: N\>
+/// KV: \<key length: u16\> \<key: N\> \<crc hash: u32\> \<value length: u32\> \<value: N\>
 ///
 /// Segment: { KV } +
 #[derive(Debug)]

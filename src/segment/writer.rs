@@ -26,6 +26,9 @@ impl Writer {
     #[doc(hidden)]
     pub fn new<P: AsRef<Path>>(segment_id: Arc<str>, path: P) -> std::io::Result<Self> {
         let path = path.as_ref();
+        let folder = path.parent().expect("should have parent directory");
+
+        std::fs::create_dir_all(folder)?;
         let file = File::create(path)?;
 
         Ok(Self {
@@ -78,13 +81,26 @@ impl Writer {
     ///
     /// Will return `Err` if an IO error occurs.
     pub fn write(&mut self, key: &[u8], value: &[u8]) -> std::io::Result<()> {
+        let mut hasher = crc32fast::Hasher::new();
+        hasher.update(value);
+        let crc = hasher.finalize();
+
         self.inner.write_u16::<BigEndian>(key.len() as u16)?;
         self.inner.write_all(key)?;
+        self.inner.write_u32::<BigEndian>(crc)?;
         self.inner.write_u32::<BigEndian>(value.len() as u32)?;
         self.inner.write_all(value)?;
 
+        // Key
         self.offset += std::mem::size_of::<u16>() as u64;
         self.offset += key.len() as u64;
+
+        // CRC
+        self.offset += std::mem::size_of::<u32>() as u64;
+
+        // TODO: compress
+
+        // Value
         self.offset += std::mem::size_of::<u32>() as u64;
         self.offset += value.len() as u64;
 

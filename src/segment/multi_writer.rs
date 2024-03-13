@@ -22,7 +22,9 @@ impl MultiWriter {
     pub fn new<P: AsRef<Path>>(target_size: u64, folder: P) -> std::io::Result<Self> {
         let folder = folder.as_ref();
         let segment_id = generate_segment_id();
-        let path = folder.join("segments").join(&*segment_id);
+
+        let segment_folder = folder.join("segments").join(&*segment_id);
+        let path = segment_folder.join("data");
 
         Ok(Self {
             folder: folder.into(),
@@ -61,7 +63,11 @@ impl MultiWriter {
         log::debug!("Rotating segment writer");
 
         let new_segment_id = generate_segment_id();
-        let path = self.folder.join("segments").join(&*new_segment_id);
+        let path = self
+            .folder
+            .join("segments")
+            .join(&*new_segment_id)
+            .join("data");
         self.writers.push(Writer::new(new_segment_id, path)?);
 
         Ok(())
@@ -73,10 +79,13 @@ impl MultiWriter {
     ///
     /// Will return `Err` if an IO error occurs.
     pub fn write(&mut self, key: &[u8], value: &[u8]) -> crate::Result<()> {
+        let target_size = self.target_size;
+
         let writer = self.get_active_writer_mut();
         writer.write(key, value)?;
 
-        if writer.offset() >= self.target_size {
+        if writer.offset() >= target_size {
+            writer.flush()?;
             self.rotate()?;
         }
 

@@ -2,7 +2,7 @@ use std::{
     collections::BTreeMap,
     sync::{Arc, RwLock},
 };
-use value_log::{Config, Index, ValueHandle, ValueLog};
+use value_log::{Config, Index, IndexWriter, ValueHandle, ValueLog};
 
 type Inner = RwLock<BTreeMap<Arc<[u8]>, ValueHandle>>;
 
@@ -30,11 +30,16 @@ impl Index for DebugIndex {
     }
 }
 
-impl DebugIndex {
-    /*  fn remove(&self, key: &[u8]) -> std::io::Result<()> {
-        self.write().expect("lock is poisoned").remove(key);
+struct DebugIndexWriter(Arc<DebugIndex>);
+
+impl IndexWriter for DebugIndexWriter {
+    fn insert_indirection(&self, key: &[u8], value: ValueHandle) -> std::io::Result<()> {
+        self.0.insert_indirection(key, value)
+    }
+
+    fn finish(&self) -> std::io::Result<()> {
         Ok(())
-    } */
+    }
 }
 
 #[test]
@@ -134,7 +139,7 @@ fn basic_kv() -> value_log::Result<()> {
         assert_eq!(item, key.repeat(1_000).into());
     }
 
-    value_log.rollover(&value_log.list_segments())?;
+    value_log.rollover(&value_log.list_segments(), DebugIndexWriter(index.clone()))?;
 
     {
         let lock = value_log.segments.read().unwrap();

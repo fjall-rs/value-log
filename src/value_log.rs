@@ -1,4 +1,6 @@
 use crate::{
+    blob_cache::BlobCache,
+    index::Writer as IndexWriter,
     segment::{merge::MergeReader, multi_writer::MultiWriter},
     version::Version,
     Config, Index, Segment, SegmentReader, SegmentWriter, ValueHandle,
@@ -11,8 +13,6 @@ use std::{
     path::PathBuf,
     sync::{atomic::AtomicU64, Arc, Mutex, RwLock},
 };
-
-/// TODO: blob cache
 
 /// A disk-resident value log.
 #[derive(Clone)]
@@ -34,6 +34,9 @@ pub struct ValueLogInner {
 
     /// External index
     pub index: Arc<dyn Index + Send + Sync>,
+
+    /// In-memory blob cache
+    blob_cache: Arc<BlobCache>,
 
     /// Segment manifest
     pub segments: RwLock<BTreeMap<Arc<str>, Arc<Segment>>>,
@@ -86,9 +89,12 @@ impl ValueLog {
             folder.sync_all()?;
         }
 
+        let blob_cache = config.blob_cache.clone();
+
         Ok(Self(Arc::new(ValueLogInner {
             config,
             path, // TODO: absolute path
+            blob_cache,
             index,
             segments: RwLock::new(BTreeMap::default()),
             semaphore: Mutex::new(()),
@@ -144,15 +150,27 @@ impl ValueLog {
             return Ok(None);
         };
 
+        if let Some(value) = self.blob_cache.get(handle) {
+            return Ok(Some(value));
+        }
+
         let mut reader = BufReader::new(File::open(&segment.path)?);
         reader.seek(std::io::SeekFrom::Start(handle.offset))?;
+
+        // TODO: handle CRC
+        let _crc = reader.read_u32::<BigEndian>()?;
 
         let val_len = reader.read_u32::<BigEndian>()?;
 
         let mut val = vec![0; val_len as usize];
         reader.read_exact(&mut val)?;
+        let val: Arc<[u8]> = val.into();
 
-        Ok(Some(val.into()))
+        // TODO: decompress
+
+        self.blob_cache.insert(handle.clone(), val.clone());
+
+        Ok(Some(val))
     }
 
     /* pub fn get_multiple(
@@ -217,7 +235,11 @@ impl ValueLog {
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    pub fn rollover(&self, ids: &[Arc<str>]) -> crate::Result<()> {
+    pub fn rollover<W: IndexWriter + Send + Sync>(
+        &self,
+        ids: &[Arc<str>],
+        index_writer: W,
+    ) -> crate::Result<()> {
         // IMPORTANT: Only allow 1 rollover at any given time
         let _guard = self.semaphore.lock().expect("lock is poisoned");
 
@@ -252,16 +274,16 @@ impl ValueLog {
                     String::from_utf8_lossy(&k)
                 );
 
-                self.index
-                    .insert_indirection(&k, ValueHandle { segment_id, offset })?;
+                index_writer.insert_indirection(&k, ValueHandle { segment_id, offset })?;
                 writer.write(&k, &v)?;
             }
 
             self.register(writer)?;
+            index_writer.finish()?;
 
             let mut lock = self.segments.write().expect("lock is poisoned");
             for id in ids {
-                std::fs::remove_file(self.path.join("segments").join(&**id))?;
+                std::fs::remove_dir_all(self.path.join("segments").join(&**id))?;
                 lock.remove(id);
             }
         }
