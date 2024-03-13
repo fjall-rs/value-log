@@ -3,7 +3,7 @@ use crate::{
     index::Writer as IndexWriter,
     segment::{merge::MergeReader, multi_writer::MultiWriter, stats::Stats},
     version::Version,
-    Config, Index, Segment, SegmentReader, SegmentWriter, ValueHandle,
+    Config, Index, Segment, SegmentWriter, ValueHandle,
 };
 use byteorder::{BigEndian, ReadBytesExt};
 use std::{
