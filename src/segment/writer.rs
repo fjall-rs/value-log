@@ -83,7 +83,15 @@ impl Writer {
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the key length is empty or greater than 2^16, or the value length is greater than 2^32.
     pub fn write(&mut self, key: &[u8], value: &[u8]) -> std::io::Result<u32> {
+        assert!(!key.is_empty());
+        assert!(key.len() <= u16::MAX.into());
+        assert!(u32::try_from(value.len()).is_ok());
+
         #[cfg(feature = "lz4")]
         let value = lz4_flex::compress_prepend_size(value);
 
@@ -91,9 +99,14 @@ impl Writer {
         hasher.update(&value);
         let crc = hasher.finalize();
 
+        // NOTE: Truncation is okay and actually needed
+        #[allow(clippy::cast_possible_truncation)]
         self.inner.write_u16::<BigEndian>(key.len() as u16)?;
         self.inner.write_all(key)?;
         self.inner.write_u32::<BigEndian>(crc)?;
+
+        // NOTE: Truncation is okay and actually needed
+        #[allow(clippy::cast_possible_truncation)]
         self.inner.write_u32::<BigEndian>(value.len() as u32)?;
         self.inner.write_all(&value)?;
 
@@ -112,6 +125,8 @@ impl Writer {
 
         self.item_count += 1;
 
+        // NOTE: Truncation is okay
+        #[allow(clippy::cast_possible_truncation)]
         Ok(value.len() as u32)
     }
 
