@@ -15,7 +15,7 @@
 //! Recently retrieved ("hot") items may be cached by an in-memory value cache to avoid
 //! repeated disk accesses.
 //!
-//! As data changes, old values will unnecessarily waste disk space. As space amplification
+//! As data changes, old values will unnecessarily occupy disk space. As space amplification
 //! increases, stale data needs to be discarded by rewriting old segments (garbage collection).
 //!
 //! While segments are internally sorted, which may help with range scans, data may not be stored
