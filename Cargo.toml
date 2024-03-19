@@ -1,5 +1,5 @@
 [package]
-name = "value_log"
+name = "value-log"
 description = "Value log implementation for key-value separated LSM storage"
 license = "MIT OR Apache-2.0"
 version = "0.0.1"
