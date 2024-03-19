@@ -268,6 +268,19 @@ impl ValueLog {
             .sum::<u64>()
     }
 
+    /// Returns the amount of stale items
+    ///
+    /// This value may not be fresh, as it is only set after running [`ValueLog::refresh_stats`].
+    #[must_use]
+    pub fn stale_items_count(&self) -> u64 {
+        self.segments
+            .read()
+            .expect("lock is poisoned")
+            .values()
+            .map(|x| x.stats.get_stale_items())
+            .sum::<u64>()
+    }
+
     /// Returns the percent of dead bytes in the value log
     ///
     /// This value may not be fresh, as it is only set after running [`ValueLog::refresh_stats`].
