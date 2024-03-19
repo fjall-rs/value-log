@@ -20,8 +20,7 @@ impl Default for Config {
 impl Config {
     /// Sets the blob cache.
     ///
-    /// Defaults to a blob cache 16 MiB of capacity shared
-    /// between all partitions inside this keyspace.
+    /// Defaults to a blob cache with 16 MiB of capacity.
     #[must_use]
     pub fn blob_cache(mut self, blob_cache: Arc<BlobCache>) -> Self {
         self.blob_cache = blob_cache;

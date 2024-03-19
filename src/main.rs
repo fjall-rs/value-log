@@ -52,7 +52,7 @@ fn main() -> value_log::Result<()> {
         let mut writer = value_log.get_writer()?;
         let segment_id = writer.segment_id();
 
-        for key in ["a", "b", "c", "d", "e"] {
+        for key in ["a", "b", "c", "d", "e", "html"] {
             let offset = writer.offset(key.as_bytes());
 
             index.insert_indirection(
@@ -107,6 +107,52 @@ fn main() -> value_log::Result<()> {
             <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-16\">Hello <i>World</i></div>
             <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-17\">Hello <i>World</i></div>
             <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-18\">Hello <i>World</i></div>
+        </html>",
+        )?;
+
+        value_log.register(writer)?;
+    }
+
+    {
+        let mut writer = value_log.get_writer()?;
+        let segment_id = writer.segment_id();
+
+        let key = "html";
+        let offset = writer.offset(key.as_bytes());
+
+        index.insert_indirection(
+            key.as_bytes(),
+            ValueHandle {
+                offset,
+                segment_id: segment_id.clone(),
+            },
+        )?;
+
+        writer.write(
+            key.as_bytes(),
+            b"
+        <html>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-0\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-1\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-2\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-3\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-4\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-5\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-6\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-7\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-8\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-9\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-10\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-11\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-12\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-13\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-14\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-15\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-16\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-17\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-18\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-19\">Hello <i>World</i></div>
+            <div data-hk=\"0-0-0-0-0-0-0-0-0-0-0-0-0-0-20\">Hello <i>World</i></div>
         </html>",
         )?;
 
@@ -241,7 +287,25 @@ fn main() -> value_log::Result<()> {
     eprintln!("=== rollover ===");
     value_log.rollover(&value_log.list_segments(), DebugIndexWriter(index.clone()))?; */
 
+    eprintln!("=== before refresh ===");
     eprintln!("{:#?}", value_log.segments.read().unwrap());
+    eprintln!(
+        "space amp: {}, wasted bytes: {}",
+        value_log.space_amp(),
+        value_log.reclaimable_bytes()
+    );
+
+    for id in value_log.segments.read().unwrap().keys() {
+        value_log.refresh_stats(id)?;
+    }
+
+    eprintln!("=== after refresh ===");
+    eprintln!("{:#?}", value_log.segments.read().unwrap());
+    eprintln!(
+        "space amp: {}, wasted bytes: {}",
+        value_log.space_amp(),
+        value_log.reclaimable_bytes()
+    );
 
     let handle = index.get(b"html")?.unwrap();
     eprintln!(

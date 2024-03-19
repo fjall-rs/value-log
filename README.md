@@ -2,14 +2,14 @@
 
 Generic value log implementation for key-value separated storage, inspired by RocksDB's BlobDB [[1]](#footnotes) and implemented in safe, stable Rust.
 
-> This crate is intended for key-value separated LSM storage.
+> This crate is intended as a building block for key-value separated LSM storage.
 > You probably want to use https://github.com/fjall-rs/fjall instead.
 
 ## Features
 
 - Thread-safe API
 - 100% safe & stable Rust
-- Supports generic index structures (LSM-tree, ...)
+- Supports generic KV-index structures (LSM-tree, ...)
 - Built-in per-blob compression (LZ4)
 - In-memory blob cache for hot data
 
@@ -24,6 +24,14 @@ The disk format will be stable from 1.0.0 (oh, the dreaded 1.0.0...) onwards. An
 All source code is licensed under MIT OR Apache-2.0.
 
 All contributions are to be licensed as MIT OR Apache-2.0.
+
+## Development
+
+### Run benchmarks
+
+```bash
+cargo bench --features bloom
+```
 
 ## Footnotes
 

@@ -4,7 +4,7 @@ use crate::ValueHandle;
 ///
 /// An index should point into the value log using [`ValueHandle`].
 pub trait Index {
-    /// Returns a value habdle for a given key.
+    /// Returns a value handle for a given key.
     ///
     /// This method is used to index back into the index to check for
     /// stale values when scanning through the value log's segments.
@@ -27,11 +27,11 @@ pub trait Index {
     fn insert_indirection(&self, key: &[u8], value: ValueHandle) -> std::io::Result<()>;
 }
 
-/// Trait that allows writing into an index
+/// Trait that allows writing into an external index
+///
+/// The write process should be atomic.
 pub trait Writer {
-    /// Inserts an value handle into the index.
-    ///
-    /// This method is called during value log garbage collection.
+    /// Inserts a value handle into the index.
     ///
     /// # Errors
     ///
@@ -39,8 +39,6 @@ pub trait Writer {
     fn insert_indirection(&self, key: &[u8], value: ValueHandle) -> std::io::Result<()>;
 
     /// Finishes the write batch.
-    ///
-    /// This operation should be atomic.
     ///
     /// # Errors
     ///

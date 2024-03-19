@@ -14,7 +14,7 @@ use std::{
     sync::{atomic::AtomicU64, Arc, Mutex, RwLock},
 };
 
-/// A disk-resident value log.
+/// A disk-resident value log
 #[derive(Clone)]
 pub struct ValueLog(Arc<ValueLogInner>);
 
@@ -41,7 +41,7 @@ pub struct ValueLogInner {
     /// Segment manifest
     pub segments: RwLock<BTreeMap<Arc<str>, Arc<Segment>>>,
 
-    semaphore: Mutex<()>,
+    rollover_guard: Mutex<()>,
 }
 
 impl ValueLog {
@@ -97,7 +97,7 @@ impl ValueLog {
             blob_cache,
             index,
             segments: RwLock::new(BTreeMap::default()),
-            semaphore: Mutex::new(()),
+            rollover_guard: Mutex::new(()),
         })))
     }
 
@@ -197,13 +197,6 @@ impl ValueLog {
         Ok(Some(val))
     }
 
-    /* pub fn get_multiple(
-        &self,
-        handles: &[ValueHandle],
-    ) -> crate::Result<Vec<Option<Vec<u8>>>> {
-        handles.iter().map(|vr| self.get(vr)).collect()
-    } */
-
     /// Initializes a new segment writer
     ///
     /// # Errors
@@ -248,21 +241,31 @@ impl ValueLog {
         Ok(())
     }
 
+    /// Returns the amount of bytes on disk that are occupied by blobs.
+    ///
+    /// This value may not be fresh, as it is only set after running [`ValueLog::refresh_stats`].
+    #[must_use]
+    pub fn disk_space_used(&self) -> u64 {
+        self.segments
+            .read()
+            .expect("lock is poisoned")
+            .values()
+            .map(|x| x.stats.total_bytes)
+            .sum::<u64>()
+    }
+
     /// Returns the amount of bytes that can be freed on disk
     /// if all segments were to be defragmented
     ///
     /// This value may not be fresh, as it is only set after running [`ValueLog::refresh_stats`].
     #[must_use]
     pub fn reclaimable_bytes(&self) -> u64 {
-        let segments = self.segments.read().expect("lock is poisoned");
-
-        let dead_bytes = segments
+        self.segments
+            .read()
+            .expect("lock is poisoned")
             .values()
             .map(|x| x.stats.get_dead_bytes())
-            .sum::<u64>();
-        drop(segments);
-
-        dead_bytes
+            .sum::<u64>()
     }
 
     /// Returns the percent of dead bytes in the value log
@@ -383,7 +386,7 @@ impl ValueLog {
         index_writer: &W,
     ) -> crate::Result<()> {
         // IMPORTANT: Only allow 1 rollover at any given time
-        let _guard = self.semaphore.lock().expect("lock is poisoned");
+        let _guard = self.rollover_guard.lock().expect("lock is poisoned");
 
         let lock = self.segments.read().expect("lock is poisoned");
 
@@ -409,7 +412,6 @@ impl ValueLog {
 
         for item in reader {
             let (k, v, _) = item?;
-            eprintln!("{k:?} => {:?}", String::from_utf8_lossy(&v));
 
             let segment_id = writer.segment_id();
             let offset = writer.offset(&k);
