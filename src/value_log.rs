@@ -231,8 +231,8 @@ impl ValueLog {
                     stats: Stats {
                         item_count: writer.item_count,
                         total_bytes: writer.written_blob_bytes,
-                        dead_items: AtomicU64::default(),
-                        dead_bytes: AtomicU64::default(),
+                        stale_items: AtomicU64::default(),
+                        stale_bytes: AtomicU64::default(),
                     },
                 }),
             );
@@ -264,7 +264,7 @@ impl ValueLog {
             .read()
             .expect("lock is poisoned")
             .values()
-            .map(|x| x.stats.get_dead_bytes())
+            .map(|x| x.stats.get_stale_bytes())
             .sum::<u64>()
     }
 
@@ -272,7 +272,7 @@ impl ValueLog {
     ///
     /// This value may not be fresh, as it is only set after running [`ValueLog::refresh_stats`].
     #[must_use]
-    pub fn dead_ratio(&self) -> f32 {
+    pub fn stale_ratio(&self) -> f32 {
         let segments = self.segments.read().expect("lock is poisoned");
 
         let used_bytes = segments.values().map(|x| x.stats.total_bytes).sum::<u64>();
@@ -280,17 +280,17 @@ impl ValueLog {
             return 0.0;
         }
 
-        let dead_bytes = segments
+        let stale_bytes = segments
             .values()
-            .map(|x| x.stats.get_dead_bytes())
+            .map(|x| x.stats.get_stale_bytes())
             .sum::<u64>();
-        if dead_bytes == 0 {
+        if stale_bytes == 0 {
             return 0.0;
         }
 
         drop(segments);
 
-        dead_bytes as f32 / used_bytes as f32
+        stale_bytes as f32 / used_bytes as f32
     }
 
     /// Returns the approximate space amplification
@@ -307,14 +307,14 @@ impl ValueLog {
             return 0.0;
         }
 
-        let dead_bytes = segments
+        let stale_bytes = segments
             .values()
-            .map(|x| x.stats.get_dead_bytes())
+            .map(|x| x.stats.get_stale_bytes())
             .sum::<u64>();
 
         drop(segments);
 
-        let alive_bytes = used_bytes - dead_bytes;
+        let alive_bytes = used_bytes - stale_bytes;
         if alive_bytes == 0 {
             return 0.0;
         }
@@ -343,8 +343,8 @@ impl ValueLog {
         // Scan segment
         let scanner = segment.scan()?;
 
-        let mut dead_items = 0;
-        let mut dead_bytes = 0;
+        let mut stale_items = 0;
+        let mut stale_bytes = 0;
 
         for item in scanner {
             let (key, val) = item?;
@@ -352,24 +352,24 @@ impl ValueLog {
             if let Some(item) = self.index.get(&key)? {
                 // NOTE: Segment IDs are monotonically increasing
                 if item.segment_id > *segment_id {
-                    dead_items += 1;
-                    dead_bytes += val.len() as u64;
+                    stale_items += 1;
+                    stale_bytes += val.len() as u64;
                 }
             } else {
-                dead_items += 1;
-                dead_bytes += val.len() as u64;
+                stale_items += 1;
+                stale_bytes += val.len() as u64;
             }
         }
 
         segment
             .stats
-            .dead_items
-            .store(dead_items, std::sync::atomic::Ordering::Release);
+            .stale_items
+            .store(stale_items, std::sync::atomic::Ordering::Release);
 
         segment
             .stats
-            .dead_bytes
-            .store(dead_bytes, std::sync::atomic::Ordering::Release);
+            .stale_bytes
+            .store(stale_bytes, std::sync::atomic::Ordering::Release);
 
         Ok(())
     }

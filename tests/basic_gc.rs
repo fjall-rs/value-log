@@ -82,7 +82,7 @@ fn basic_gc() -> value_log::Result<()> {
         let lock = value_log.segments.read().unwrap();
         assert_eq!(1, lock.len());
         assert_eq!(5, lock.values().next().unwrap().len());
-        assert_eq!(0, lock.values().next().unwrap().stats.get_dead_items());
+        assert_eq!(0, lock.values().next().unwrap().stats.get_stale_items());
     }
 
     for (key, handle) in index.0.read().unwrap().iter() {
@@ -118,7 +118,7 @@ fn basic_gc() -> value_log::Result<()> {
         let lock = value_log.segments.read().unwrap();
         assert_eq!(2, lock.len());
         assert_eq!(5, lock.values().next().unwrap().len());
-        assert_eq!(0, lock.values().next().unwrap().stats.get_dead_items());
+        assert_eq!(0, lock.values().next().unwrap().stats.get_stale_items());
     }
 
     for (key, handle) in index.0.read().unwrap().iter() {
@@ -135,7 +135,7 @@ fn basic_gc() -> value_log::Result<()> {
         let lock = value_log.segments.read().unwrap();
         assert_eq!(1, lock.len());
         assert_eq!(5, lock.values().next().unwrap().len());
-        assert_eq!(0, lock.values().next().unwrap().stats.get_dead_items());
+        assert_eq!(0, lock.values().next().unwrap().stats.get_stale_items());
     }
 
     Ok(())

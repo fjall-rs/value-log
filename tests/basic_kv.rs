@@ -73,7 +73,7 @@ fn basic_kv() -> value_log::Result<()> {
 
         let segment = lock.values().next().unwrap();
         assert_eq!(items.len() as u64, segment.len());
-        assert_eq!(0, segment.stats.get_dead_items());
+        assert_eq!(0, segment.stats.get_stale_items());
     }
 
     for (key, handle) in index.0.read().unwrap().iter() {

@@ -44,7 +44,7 @@ fn worst_case_space_amp() -> value_log::Result<()> {
     let value_log = ValueLog::new(vl_path, Config::default(), index.clone())?;
 
     assert_eq!(0.0, value_log.space_amp());
-    assert_eq!(0.0, value_log.dead_ratio());
+    assert_eq!(0.0, value_log.stale_ratio());
 
     let key = "key";
     let value = "value";
@@ -75,7 +75,7 @@ fn worst_case_space_amp() -> value_log::Result<()> {
         assert_eq!(x as f32, value_log.space_amp());
 
         if x > 1 {
-            assert!((1.0 - (1.0 / x as f32) - value_log.dead_ratio()) < 0.00001);
+            assert!((1.0 - (1.0 / x as f32) - value_log.stale_ratio()) < 0.00001);
         }
     }
 
@@ -93,7 +93,7 @@ fn no_overlap_space_amp() -> value_log::Result<()> {
     std::fs::create_dir_all(vl_path)?;
     let value_log = ValueLog::new(vl_path, Config::default(), index.clone())?;
 
-    assert_eq!(0.0, value_log.dead_ratio());
+    assert_eq!(0.0, value_log.stale_ratio());
     assert_eq!(0.0, value_log.space_amp());
 
     // NOTE: No blobs overlap, so there are no dead blobs => space amp = 1.0 => perfect space amp
@@ -122,7 +122,7 @@ fn no_overlap_space_amp() -> value_log::Result<()> {
         }
 
         assert_eq!(1.0, value_log.space_amp());
-        assert_eq!(0.0, value_log.dead_ratio());
+        assert_eq!(0.0, value_log.stale_ratio());
     }
 
     Ok(())
