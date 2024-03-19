@@ -27,7 +27,7 @@
 //! amplification when storing large blobs.
 //!
 //! Use a value log, when:
-//! - you are storing large documents (HTML pages, small images, ...)
+//! - you are storing large values (HTML pages, big JSON, small images, ...)
 //! - your data is rarely deleted, or you do not have strict disk space requirements
 //! - your access pattern is point read heavy
 
