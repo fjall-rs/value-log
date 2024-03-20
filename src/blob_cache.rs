@@ -9,8 +9,10 @@ type Item = Arc<[u8]>;
 struct BlobWeighter;
 
 impl Weighter<CacheKey, Item> for BlobWeighter {
+    // NOTE: quick_cache only supports u32 as weight, but that's fine
+    // 4 GB blobs are too big anyway
+    #[allow(clippy::cast_possible_truncation)]
     fn weight(&self, _: &CacheKey, blob: &Item) -> u32 {
-        // TODO: quick_cache only supports u32 as weight...?
         blob.len() as u32
     }
 }

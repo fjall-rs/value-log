@@ -1,14 +1,14 @@
+use crate::id::SegmentId;
 use byteorder::{BigEndian, ReadBytesExt};
 use std::{
     fs::File,
     io::{BufReader, Read},
     path::PathBuf,
-    sync::Arc,
 };
 
 /// Reads through a segment in order.
 pub struct Reader {
-    pub(crate) segment_id: Arc<str>,
+    pub(crate) segment_id: SegmentId,
     inner: BufReader<File>,
 }
 
@@ -18,7 +18,7 @@ impl Reader {
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    pub fn new<P: Into<PathBuf>>(path: P, segment_id: Arc<str>) -> std::io::Result<Self> {
+    pub fn new<P: Into<PathBuf>>(path: P, segment_id: SegmentId) -> std::io::Result<Self> {
         let path = path.into();
         let file_reader = BufReader::new(File::open(path)?);
 

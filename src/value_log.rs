@@ -1,17 +1,19 @@
 use crate::{
     blob_cache::BlobCache,
+    id::{IdGenerator, SegmentId},
     index::Writer as IndexWriter,
-    segment::{merge::MergeReader, multi_writer::MultiWriter, stats::Stats},
+    manifest::{SegmentManifest, SEGMENTS_FOLDER, VLOG_MARKER},
+    path::absolute_path,
+    segment::merge::MergeReader,
     version::Version,
-    Config, Index, Segment, SegmentWriter, ValueHandle,
+    Config, Index, SegmentWriter, ValueHandle,
 };
 use byteorder::{BigEndian, ReadBytesExt};
 use std::{
-    collections::BTreeMap,
     fs::File,
     io::{BufReader, Read, Seek},
     path::PathBuf,
-    sync::{atomic::AtomicU64, Arc, Mutex, RwLock},
+    sync::{Arc, Mutex, RwLock},
 };
 
 /// A disk-resident value log
@@ -39,37 +41,48 @@ pub struct ValueLogInner {
     blob_cache: Arc<BlobCache>,
 
     /// Segment manifest
-    pub segments: RwLock<BTreeMap<Arc<str>, Arc<Segment>>>,
+    pub manifest: RwLock<SegmentManifest>,
+
+    id_generator: IdGenerator,
 
     rollover_guard: Mutex<()>,
 }
 
 impl ValueLog {
-    /// Creates or recovers a value log
-    pub fn new<P: Into<PathBuf>>(
-        path: P,
-        config: Config,
-        index: Arc<dyn Index + Send + Sync>,
-    ) -> crate::Result<Self> {
-        Self::create_new(path, config, index)
-        // TODO: recover if exists
-    }
-
-    /// Creates a new empty value log in a folder
-    pub(crate) fn create_new<P: Into<PathBuf>>(
+    /// Creates or recovers a value log in the given directory.
+    ///
+    /// # Errors
+    ///
+    /// Will return `Err` if an IO error occurs.
+    pub fn open<P: Into<PathBuf>>(
         path: P,
         config: Config,
         index: Arc<dyn Index + Send + Sync>,
     ) -> crate::Result<Self> {
         let path = path.into();
+
+        if path.join(VLOG_MARKER).try_exists()? {
+            Self::recover(path, config, index)
+        } else {
+            Self::create_new(path, config, index)
+        }
+    }
+
+    /// Creates a new empty value log in a directory.
+    pub(crate) fn create_new<P: Into<PathBuf>>(
+        path: P,
+        config: Config,
+        index: Arc<dyn Index + Send + Sync>,
+    ) -> crate::Result<Self> {
+        let path = absolute_path(path.into());
         log::trace!("Creating value-log at {}", path.display());
 
         std::fs::create_dir_all(&path)?;
 
-        let marker_path = path.join(".vlog");
+        let marker_path = path.join(VLOG_MARKER);
         assert!(!marker_path.try_exists()?);
 
-        std::fs::create_dir_all(path.join("segments"))?;
+        std::fs::create_dir_all(path.join(SEGMENTS_FOLDER))?;
 
         // NOTE: Lastly, fsync .vlog marker, which contains the version
         // -> the V-log is fully initialized
@@ -82,7 +95,7 @@ impl ValueLog {
         {
             // fsync folders on Unix
 
-            let folder = std::fs::File::open(path.join("segments"))?;
+            let folder = std::fs::File::open(path.join(SEGMENTS_FOLDER))?;
             folder.sync_all()?;
 
             let folder = std::fs::File::open(&path)?;
@@ -90,58 +103,29 @@ impl ValueLog {
         }
 
         let blob_cache = config.blob_cache.clone();
+        let manifest = SegmentManifest::create_new(&path)?;
 
         Ok(Self(Arc::new(ValueLogInner {
             config,
-            path, // TODO: absolute path
+            path,
             blob_cache,
             index,
-            segments: RwLock::new(BTreeMap::default()),
+            manifest: RwLock::new(manifest),
+            id_generator: IdGenerator::default(),
             rollover_guard: Mutex::new(()),
         })))
     }
 
-    /// Gets a segment
-    #[must_use]
-    pub fn get_segment(&self, id: &Arc<str>) -> Option<Arc<Segment>> {
-        self.segments
-            .read()
-            .expect("lock is poisoned")
-            .get(id)
-            .cloned()
-    }
-
-    /// Lists all segment IDs
-    #[must_use]
-    pub fn list_segment_ids(&self) -> Vec<Arc<str>> {
-        self.segments
-            .read()
-            .expect("lock is poisoned")
-            .keys()
-            .cloned()
-            .collect()
-    }
-
-    /// Lists all segments
-    #[must_use]
-    pub fn list_segments(&self) -> Vec<Arc<Segment>> {
-        self.segments
-            .read()
-            .expect("lock is poisoned")
-            .values()
-            .cloned()
-            .collect()
-    }
-
     pub(crate) fn recover<P: Into<PathBuf>>(
         path: P,
-        _index: Arc<dyn Index + Send + Sync>,
-    ) -> crate::Result<()> {
+        config: Config,
+        index: Arc<dyn Index + Send + Sync>,
+    ) -> crate::Result<Self> {
         let path = path.into();
         log::info!("Recovering value-log at {}", path.display());
 
         {
-            let bytes = std::fs::read(path.join(".vlog"))?;
+            let bytes = std::fs::read(path.join(VLOG_MARKER))?;
 
             if let Some(version) = Version::parse_file_header(&bytes) {
                 if version != Version::V1 {
@@ -152,7 +136,35 @@ impl ValueLog {
             }
         }
 
-        todo!()
+        let blob_cache = config.blob_cache.clone();
+        let manifest = SegmentManifest::recover(&path)?;
+
+        Ok(Self(Arc::new(ValueLogInner {
+            config,
+            path,
+            blob_cache,
+            index,
+            manifest: RwLock::new(manifest),
+            id_generator: IdGenerator::default(),
+            rollover_guard: Mutex::new(()),
+        })))
+    }
+
+    /// Registers writer
+    pub fn register(&self, writer: SegmentWriter) -> crate::Result<()> {
+        self.manifest
+            .write()
+            .expect("lock is poisoned")
+            .register(writer)
+    }
+
+    /// Returns segment count
+    pub fn segment_count(&self) -> usize {
+        self.manifest
+            .read()
+            .expect("lock is poisoned")
+            .segments
+            .len()
     }
 
     /// Resolves a value handle
@@ -162,11 +174,10 @@ impl ValueLog {
     /// Will return `Err` if an IO error occurs.
     pub fn get(&self, handle: &ValueHandle) -> crate::Result<Option<Arc<[u8]>>> {
         let Some(segment) = self
-            .segments
+            .manifest
             .read()
             .expect("lock is poisoned")
-            .get(&handle.segment_id)
-            .cloned()
+            .get_segment(handle.segment_id)
         else {
             return Ok(None);
         };
@@ -204,135 +215,10 @@ impl ValueLog {
     /// Will return `Err` if an IO error occurs.
     pub fn get_writer(&self) -> crate::Result<SegmentWriter> {
         Ok(SegmentWriter::new(
+            self.id_generator.clone(),
             self.config.segment_size_bytes,
             &self.path,
         )?)
-    }
-
-    /// Registers a new segment (blob file) by consuming a writer
-    ///
-    /// # Errors
-    ///
-    /// Will return `Err` if an IO error occurs.
-    pub fn register(&self, writer: MultiWriter) -> crate::Result<()> {
-        let writers = writer.finish()?;
-
-        let mut lock = self.segments.write().expect("lock is poisoned");
-
-        for writer in writers {
-            let segment_id = writer.segment_id.clone();
-            let segment_folder = writer.folder.clone();
-
-            lock.insert(
-                segment_id.clone(),
-                Arc::new(Segment {
-                    id: segment_id,
-                    path: segment_folder,
-                    stats: Stats {
-                        item_count: writer.item_count,
-                        total_bytes: writer.written_blob_bytes,
-                        stale_items: AtomicU64::default(),
-                        stale_bytes: AtomicU64::default(),
-                    },
-                }),
-            );
-        }
-
-        Ok(())
-    }
-
-    /// Returns the amount of bytes on disk that are occupied by blobs.
-    ///
-    /// This value may not be fresh, as it is only set after running [`ValueLog::refresh_stats`].
-    #[must_use]
-    pub fn disk_space_used(&self) -> u64 {
-        self.segments
-            .read()
-            .expect("lock is poisoned")
-            .values()
-            .map(|x| x.stats.total_bytes)
-            .sum::<u64>()
-    }
-
-    /// Returns the amount of bytes that can be freed on disk
-    /// if all segments were to be defragmented
-    ///
-    /// This value may not be fresh, as it is only set after running [`ValueLog::refresh_stats`].
-    #[must_use]
-    pub fn reclaimable_bytes(&self) -> u64 {
-        self.segments
-            .read()
-            .expect("lock is poisoned")
-            .values()
-            .map(|x| x.stats.get_stale_bytes())
-            .sum::<u64>()
-    }
-
-    /// Returns the amount of stale items
-    ///
-    /// This value may not be fresh, as it is only set after running [`ValueLog::refresh_stats`].
-    #[must_use]
-    pub fn stale_items_count(&self) -> u64 {
-        self.segments
-            .read()
-            .expect("lock is poisoned")
-            .values()
-            .map(|x| x.stats.get_stale_items())
-            .sum::<u64>()
-    }
-
-    /// Returns the percent of dead bytes in the value log
-    ///
-    /// This value may not be fresh, as it is only set after running [`ValueLog::refresh_stats`].
-    #[must_use]
-    pub fn stale_ratio(&self) -> f32 {
-        let segments = self.segments.read().expect("lock is poisoned");
-
-        let used_bytes = segments.values().map(|x| x.stats.total_bytes).sum::<u64>();
-        if used_bytes == 0 {
-            return 0.0;
-        }
-
-        let stale_bytes = segments
-            .values()
-            .map(|x| x.stats.get_stale_bytes())
-            .sum::<u64>();
-        if stale_bytes == 0 {
-            return 0.0;
-        }
-
-        drop(segments);
-
-        stale_bytes as f32 / used_bytes as f32
-    }
-
-    /// Returns the approximate space amplification
-    ///
-    /// Returns 0.0 if there are no items.
-    ///
-    /// This value may not be fresh, as it is only set after running [`ValueLog::refresh_stats`].
-    #[must_use]
-    pub fn space_amp(&self) -> f32 {
-        let segments = self.segments.read().expect("lock is poisoned");
-
-        let used_bytes = segments.values().map(|x| x.stats.total_bytes).sum::<u64>();
-        if used_bytes == 0 {
-            return 0.0;
-        }
-
-        let stale_bytes = segments
-            .values()
-            .map(|x| x.stats.get_stale_bytes())
-            .sum::<u64>();
-
-        drop(segments);
-
-        let alive_bytes = used_bytes - stale_bytes;
-        if alive_bytes == 0 {
-            return 0.0;
-        }
-
-        used_bytes as f32 / alive_bytes as f32
     }
 
     /// Scans through a segment, refreshing its statistics
@@ -342,13 +228,12 @@ impl ValueLog {
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    pub fn refresh_stats(&self, segment_id: &Arc<str>) -> std::io::Result<()> {
+    pub fn refresh_stats(&self, segment_id: SegmentId) -> std::io::Result<()> {
         let Some(segment) = self
-            .segments
+            .manifest
             .read()
             .expect("lock is poisoned")
-            .get(segment_id)
-            .cloned()
+            .get_segment(segment_id)
         else {
             return Ok(());
         };
@@ -356,15 +241,20 @@ impl ValueLog {
         // Scan segment
         let scanner = segment.scan()?;
 
+        let mut item_count = 0;
+        let mut total_bytes = 0;
+
         let mut stale_items = 0;
         let mut stale_bytes = 0;
 
         for item in scanner {
             let (key, val) = item?;
+            item_count += 1;
+            total_bytes += val.len() as u64;
 
             if let Some(item) = self.index.get(&key)? {
                 // NOTE: Segment IDs are monotonically increasing
-                if item.segment_id > *segment_id {
+                if item.segment_id > segment_id {
                     stale_items += 1;
                     stale_bytes += val.len() as u64;
                 }
@@ -376,6 +266,16 @@ impl ValueLog {
 
         segment
             .stats
+            .item_count
+            .store(item_count, std::sync::atomic::Ordering::Release);
+
+        segment
+            .stats
+            .total_bytes
+            .store(total_bytes, std::sync::atomic::Ordering::Release);
+
+        segment
+            .stats
             .stale_items
             .store(stale_items, std::sync::atomic::Ordering::Release);
 
@@ -383,6 +283,9 @@ impl ValueLog {
             .stats
             .stale_bytes
             .store(stale_bytes, std::sync::atomic::Ordering::Release);
+
+        // TODO: need to store stats atomically, to make recovery fast
+        // TODO: changing stats doesn't happen **too** often, so the I/O is fine
 
         Ok(())
     }
@@ -395,17 +298,17 @@ impl ValueLog {
     /// Will return `Err` if an IO error occurs.
     pub fn rollover<W: IndexWriter + Send + Sync>(
         &self,
-        ids: &[Arc<str>],
+        ids: &[u64],
         index_writer: &W,
     ) -> crate::Result<()> {
         // IMPORTANT: Only allow 1 rollover at any given time
         let _guard = self.rollover_guard.lock().expect("lock is poisoned");
 
-        let lock = self.segments.read().expect("lock is poisoned");
+        let lock = self.manifest.read().expect("lock is poisoned");
 
         let segments = ids
             .iter()
-            .map(|x| lock.get(&**x).cloned())
+            .map(|x| lock.segments.get(x).cloned())
             .collect::<Option<Vec<_>>>();
 
         drop(lock);
@@ -438,14 +341,11 @@ impl ValueLog {
             writer.write(&k, &v)?;
         }
 
-        self.register(writer)?;
-        index_writer.finish()?;
+        let mut manifest = self.manifest.write().expect("lock is poisoned");
 
-        let mut lock = self.segments.write().expect("lock is poisoned");
-        for id in ids {
-            std::fs::remove_dir_all(self.path.join("segments").join(&**id))?;
-            lock.remove(id);
-        }
+        manifest.register(writer)?;
+        index_writer.finish()?;
+        manifest.drop_segments(ids)?;
 
         Ok(())
     }

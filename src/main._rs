@@ -46,7 +46,7 @@ fn main() -> value_log::Result<()> {
     }
     std::fs::create_dir_all(vl_path)?;
 
-    let value_log = ValueLog::new(vl_path, Config::default(), index.clone())?;
+    let value_log = ValueLog::open(vl_path, Config::default(), index.clone())?;
 
     {
         let mut writer = value_log.get_writer()?;
@@ -296,7 +296,7 @@ fn main() -> value_log::Result<()> {
     );
 
     for id in value_log.segments.read().unwrap().keys() {
-        value_log.refresh_stats(id)?;
+        value_log.refresh_stats(*id)?;
     }
 
     eprintln!("=== after refresh ===");

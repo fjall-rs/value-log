@@ -1,15 +1,13 @@
 use super::writer::Writer;
-use crate::id::generate_segment_id;
-use std::{
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use crate::id::{IdGenerator, SegmentId};
+use std::path::{Path, PathBuf};
 
 /// Segment writer, may write multiple segments
 pub struct MultiWriter {
     root_folder: PathBuf,
     target_size: u64,
     writers: Vec<Writer>,
+    id_generator: IdGenerator,
 }
 
 impl MultiWriter {
@@ -19,12 +17,21 @@ impl MultiWriter {
     ///
     /// Will return `Err` if an IO error occurs.
     #[doc(hidden)]
-    pub fn new<P: AsRef<Path>>(target_size: u64, folder: P) -> std::io::Result<Self> {
+    pub fn new<P: AsRef<Path>>(
+        id_generator: IdGenerator,
+        target_size: u64,
+        folder: P,
+    ) -> std::io::Result<Self> {
+        let segment_id = id_generator.next();
+
         let folder = folder.as_ref();
-        let segment_id = generate_segment_id();
-        let path = folder.join("segments").join(&*segment_id).join("data");
+        let path = folder
+            .join("segments")
+            .join(segment_id.to_string())
+            .join("data");
 
         Ok(Self {
+            id_generator,
             root_folder: folder.into(),
             target_size,
             writers: vec![Writer::new(segment_id, path)?],
@@ -52,7 +59,7 @@ impl MultiWriter {
 
     /// Returns the segment ID
     #[must_use]
-    pub fn segment_id(&self) -> Arc<str> {
+    pub fn segment_id(&self) -> SegmentId {
         self.get_active_writer().segment_id()
     }
 
@@ -60,12 +67,12 @@ impl MultiWriter {
     fn rotate(&mut self) -> crate::Result<()> {
         log::debug!("Rotating segment writer");
 
-        let new_segment_id = generate_segment_id();
+        let new_segment_id = self.id_generator.next();
 
         let path = self
             .root_folder
             .join("segments")
-            .join(&*new_segment_id)
+            .join(new_segment_id.to_string())
             .join("data");
 
         self.writers.push(Writer::new(new_segment_id, path)?);

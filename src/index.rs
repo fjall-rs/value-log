@@ -13,18 +13,6 @@ pub trait Index {
     ///
     /// Will return `Err` if an IO error occurs.
     fn get(&self, key: &[u8]) -> std::io::Result<Option<ValueHandle>>;
-
-    // TODO: shouldn'be part of Index... remove
-    // TODO: flushing to value log should use `Writer` (atomic)
-
-    /// Inserts an value handle into the index.
-    ///
-    /// This method is called during value log garbage collection.
-    ///
-    /// # Errors
-    ///
-    /// Will return `Err` if an IO error occurs.
-    fn insert_indirection(&self, key: &[u8], value: ValueHandle) -> std::io::Result<()>;
 }
 
 /// Trait that allows writing into an external index

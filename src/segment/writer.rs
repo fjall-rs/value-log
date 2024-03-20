@@ -1,15 +1,15 @@
+use crate::id::SegmentId;
 use byteorder::{BigEndian, WriteBytesExt};
 use std::{
     fs::File,
     io::{BufWriter, Write},
     path::{Path, PathBuf},
-    sync::Arc,
 };
 
 /// Segment writer
 pub struct Writer {
     pub(crate) folder: PathBuf,
-    pub(crate) segment_id: Arc<str>,
+    pub(crate) segment_id: SegmentId,
 
     inner: BufWriter<File>,
 
@@ -26,7 +26,7 @@ impl Writer {
     ///
     /// Will return `Err` if an IO error occurs.
     #[doc(hidden)]
-    pub fn new<P: AsRef<Path>>(segment_id: Arc<str>, path: P) -> std::io::Result<Self> {
+    pub fn new<P: AsRef<Path>>(segment_id: SegmentId, path: P) -> std::io::Result<Self> {
         let path = path.as_ref();
         let folder = path.parent().expect("should have parent directory");
 
@@ -46,27 +46,6 @@ impl Writer {
     /// Returns the current offset in the file.
     ///
     /// This can be used to index an item into an external `Index`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use value_log::SegmentWriter;
-    /// # use std::collections::HashMap;
-    /// #
-    /// # let folder = tempfile::tempdir()?;
-    /// # std::fs::create_dir_all(folder.path().join("segments"))?;
-    /// # let mut writer = SegmentWriter::new(1_000, folder)?;
-    /// # let mut index = HashMap::new();
-    /// #
-    /// # let items = [(b"1", b"1"), (b"2", b"2")];
-    /// #
-    /// for (key, value) in items {  
-    ///     index.insert(key, writer.offset(key));
-    ///     writer.write(key, value)?;
-    /// }
-    /// #
-    /// # Ok::<(), value_log::Error>(())
-    /// ```
     #[must_use]
     pub fn offset(&self) -> u64 {
         self.offset
@@ -74,8 +53,8 @@ impl Writer {
 
     /// Returns the segment ID
     #[must_use]
-    pub fn segment_id(&self) -> Arc<str> {
-        self.segment_id.clone()
+    pub fn segment_id(&self) -> SegmentId {
+        self.segment_id
     }
 
     /// Writes an item into the file

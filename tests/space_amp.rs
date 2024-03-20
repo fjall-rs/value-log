@@ -18,17 +18,19 @@ impl std::ops::Deref for DebugIndex {
     }
 }
 
-impl Index for DebugIndex {
-    fn get(&self, key: &[u8]) -> std::io::Result<Option<ValueHandle>> {
-        Ok(self.read().expect("lock is poisoned").get(key).cloned())
-    }
-
+impl DebugIndex {
     fn insert_indirection(&self, key: &[u8], value: ValueHandle) -> std::io::Result<()> {
         self.write()
             .expect("lock is poisoned")
             .insert(key.into(), value);
 
         Ok(())
+    }
+}
+
+impl Index for DebugIndex {
+    fn get(&self, key: &[u8]) -> std::io::Result<Option<ValueHandle>> {
+        Ok(self.read().expect("lock is poisoned").get(key).cloned())
     }
 }
 
@@ -41,10 +43,24 @@ fn worst_case_space_amp() -> value_log::Result<()> {
 
     let vl_path = folder.path();
     std::fs::create_dir_all(vl_path)?;
-    let value_log = ValueLog::new(vl_path, Config::default(), index.clone())?;
+    let value_log = ValueLog::open(vl_path, Config::default(), index.clone())?;
 
-    assert_eq!(0.0, value_log.space_amp());
-    assert_eq!(0.0, value_log.stale_ratio());
+    assert_eq!(
+        0.0,
+        value_log
+            .manifest
+            .read()
+            .expect("lock is poisoned")
+            .space_amp()
+    );
+    assert_eq!(
+        0.0,
+        value_log
+            .manifest
+            .read()
+            .expect("lock is poisoned")
+            .stale_ratio()
+    );
 
     let key = "key";
     let value = "value";
@@ -57,25 +73,39 @@ fn worst_case_space_amp() -> value_log::Result<()> {
 
         let offset = writer.offset(key.as_bytes());
 
-        index.insert_indirection(
-            key.as_bytes(),
-            ValueHandle {
-                offset,
-                segment_id: segment_id.clone(),
-            },
-        )?;
+        index.insert_indirection(key.as_bytes(), ValueHandle { offset, segment_id })?;
 
         writer.write(key.as_bytes(), value.as_bytes())?;
         value_log.register(writer)?;
 
-        for id in value_log.list_segment_ids() {
-            value_log.refresh_stats(&id)?;
+        for id in value_log
+            .manifest
+            .read()
+            .expect("lock is poisoned")
+            .list_segment_ids()
+        {
+            value_log.refresh_stats(id)?;
         }
 
-        assert_eq!(x as f32, value_log.space_amp());
+        assert_eq!(
+            x as f32,
+            value_log
+                .manifest
+                .read()
+                .expect("lock is poisoned")
+                .space_amp()
+        );
 
         if x > 1 {
-            assert!((1.0 - (1.0 / x as f32) - value_log.stale_ratio()) < 0.00001);
+            assert!(
+                (1.0 - (1.0 / x as f32)
+                    - value_log
+                        .manifest
+                        .read()
+                        .expect("lock is poisoned")
+                        .stale_ratio())
+                    < 0.00001
+            );
         }
     }
 
@@ -91,10 +121,24 @@ fn no_overlap_space_amp() -> value_log::Result<()> {
 
     let vl_path = folder.path();
     std::fs::create_dir_all(vl_path)?;
-    let value_log = ValueLog::new(vl_path, Config::default(), index.clone())?;
+    let value_log = ValueLog::open(vl_path, Config::default(), index.clone())?;
 
-    assert_eq!(0.0, value_log.stale_ratio());
-    assert_eq!(0.0, value_log.space_amp());
+    assert_eq!(
+        0.0,
+        value_log
+            .manifest
+            .read()
+            .expect("lock is poisoned")
+            .stale_ratio()
+    );
+    assert_eq!(
+        0.0,
+        value_log
+            .manifest
+            .read()
+            .expect("lock is poisoned")
+            .space_amp()
+    );
 
     // NOTE: No blobs overlap, so there are no dead blobs => space amp = 1.0 => perfect space amp
     for i in 0..100 {
@@ -106,23 +150,36 @@ fn no_overlap_space_amp() -> value_log::Result<()> {
 
         let offset = writer.offset(key.as_bytes());
 
-        index.insert_indirection(
-            key.as_bytes(),
-            ValueHandle {
-                offset,
-                segment_id: segment_id.clone(),
-            },
-        )?;
+        index.insert_indirection(key.as_bytes(), ValueHandle { offset, segment_id })?;
 
         writer.write(key.as_bytes(), value.as_bytes())?;
         value_log.register(writer)?;
 
-        for id in value_log.list_segment_ids() {
-            value_log.refresh_stats(&id)?;
+        for id in value_log
+            .manifest
+            .read()
+            .expect("lock is poisoned")
+            .list_segment_ids()
+        {
+            value_log.refresh_stats(id)?;
         }
 
-        assert_eq!(1.0, value_log.space_amp());
-        assert_eq!(0.0, value_log.stale_ratio());
+        assert_eq!(
+            1.0,
+            value_log
+                .manifest
+                .read()
+                .expect("lock is poisoned")
+                .space_amp()
+        );
+        assert_eq!(
+            0.0,
+            value_log
+                .manifest
+                .read()
+                .expect("lock is poisoned")
+                .stale_ratio()
+        );
     }
 
     Ok(())

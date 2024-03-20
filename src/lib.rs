@@ -44,6 +44,8 @@ mod error;
 mod handle;
 mod id;
 mod index;
+mod manifest;
+mod path;
 mod segment;
 mod value_log;
 mod version;

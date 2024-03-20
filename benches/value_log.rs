@@ -9,11 +9,7 @@ use value_log::{BlobCache, Config, Index, ValueHandle, ValueLog};
 #[derive(Default)]
 pub struct DebugIndex(RwLock<BTreeMap<Arc<[u8]>, ValueHandle>>);
 
-impl Index for DebugIndex {
-    fn get(&self, key: &[u8]) -> std::io::Result<Option<ValueHandle>> {
-        Ok(self.0.read().expect("lock is poisoned").get(key).cloned())
-    }
-
+impl DebugIndex {
     fn insert_indirection(&self, key: &[u8], value: ValueHandle) -> std::io::Result<()> {
         self.0
             .write()
@@ -21,6 +17,12 @@ impl Index for DebugIndex {
             .insert(key.into(), value);
 
         Ok(())
+    }
+}
+
+impl Index for DebugIndex {
+    fn get(&self, key: &[u8]) -> std::io::Result<Option<ValueHandle>> {
+        Ok(self.0.read().expect("lock is poisoned").get(key).cloned())
     }
 }
 
@@ -48,7 +50,7 @@ fn load_value(c: &mut Criterion) {
         let folder = tempfile::tempdir().unwrap();
         let vl_path = folder.path();
 
-        let value_log = ValueLog::new(
+        let value_log = ValueLog::open(
             vl_path,
             Config::default().blob_cache(Arc::new(BlobCache::with_capacity_bytes(0))),
             index.clone(),
@@ -65,13 +67,7 @@ fn load_value(c: &mut Criterion) {
             let offset = writer.offset(key.as_bytes());
 
             index
-                .insert_indirection(
-                    key.as_bytes(),
-                    ValueHandle {
-                        offset,
-                        segment_id: segment_id.clone(),
-                    },
-                )
+                .insert_indirection(key.as_bytes(), ValueHandle { offset, segment_id })
                 .unwrap();
 
             let mut data = vec![0u8; size];
@@ -101,7 +97,7 @@ fn load_value(c: &mut Criterion) {
         let folder = tempfile::tempdir().unwrap();
         let vl_path = folder.path();
 
-        let value_log = ValueLog::new(
+        let value_log = ValueLog::open(
             vl_path,
             Config::default()
                 .blob_cache(Arc::new(BlobCache::with_capacity_bytes(64 * 1_024 * 1_024))),
@@ -119,13 +115,7 @@ fn load_value(c: &mut Criterion) {
             let offset = writer.offset(key.as_bytes());
 
             index
-                .insert_indirection(
-                    key.as_bytes(),
-                    ValueHandle {
-                        offset,
-                        segment_id: segment_id.clone(),
-                    },
-                )
+                .insert_indirection(key.as_bytes(), ValueHandle { offset, segment_id })
                 .unwrap();
 
             let mut data = vec![0u8; size];
@@ -161,7 +151,7 @@ fn compression(c: &mut Criterion) {
     let folder = tempfile::tempdir().unwrap();
     let vl_path = folder.path();
 
-    let value_log = ValueLog::new(
+    let value_log = ValueLog::open(
         vl_path,
         Config::default().blob_cache(Arc::new(BlobCache::with_capacity_bytes(0))),
         index.clone(),
@@ -180,13 +170,7 @@ fn compression(c: &mut Criterion) {
         let offset = writer.offset(key.as_bytes());
 
         index
-            .insert_indirection(
-                key.as_bytes(),
-                ValueHandle {
-                    offset,
-                    segment_id: segment_id.clone(),
-                },
-            )
+            .insert_indirection(key.as_bytes(), ValueHandle { offset, segment_id })
             .unwrap();
 
         let mut data = vec![0u8; size_mb * 1_024 * 1_024];
@@ -200,13 +184,7 @@ fn compression(c: &mut Criterion) {
         let offset = writer.offset(key.as_bytes());
 
         index
-            .insert_indirection(
-                key.as_bytes(),
-                ValueHandle {
-                    offset,
-                    segment_id: segment_id.clone(),
-                },
-            )
+            .insert_indirection(key.as_bytes(), ValueHandle { offset, segment_id })
             .unwrap();
 
         let dummy = b"abcdefgh";

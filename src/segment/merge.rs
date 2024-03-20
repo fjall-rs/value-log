@@ -1,5 +1,5 @@
-use crate::SegmentReader;
-use std::{cmp::Reverse, sync::Arc};
+use crate::{id::SegmentId, SegmentReader};
+use std::cmp::Reverse;
 
 // TODO: replace with MinHeap
 use min_max_heap::MinMaxHeap;
@@ -11,7 +11,7 @@ struct IteratorValue {
     index: IteratorIndex,
     key: Vec<u8>,
     value: Vec<u8>,
-    segment_id: Arc<str>,
+    segment_id: SegmentId,
 }
 
 impl PartialEq for IteratorValue {
@@ -33,6 +33,7 @@ impl Ord for IteratorValue {
     }
 }
 
+/// Interleaves multiple segment readers into a single, sorted stream
 #[allow(clippy::module_name_repetitions)]
 pub struct MergeReader {
     readers: Vec<SegmentReader>,
@@ -53,7 +54,7 @@ impl MergeReader {
 
         if let Some(value) = reader.next() {
             let (k, v) = value?;
-            let segment_id = reader.segment_id.clone();
+            let segment_id = reader.segment_id;
 
             self.heap.push(IteratorValue {
                 index: idx,
@@ -76,7 +77,7 @@ impl MergeReader {
 }
 
 impl Iterator for MergeReader {
-    type Item = crate::Result<(Vec<u8>, Vec<u8>, Arc<str>)>;
+    type Item = crate::Result<(Vec<u8>, Vec<u8>, SegmentId)>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.heap.is_empty() {
