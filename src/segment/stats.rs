@@ -20,6 +20,10 @@ impl Stats {
         self.total_bytes.load(std::sync::atomic::Ordering::Acquire)
     }
 
+    pub fn is_stale(&self) -> bool {
+        self.get_stale_items() == self.item_count()
+    }
+
     /// Returns the percent of dead items in the segment
     pub fn stale_ratio(&self) -> f32 {
         let dead = self.get_stale_items() as f32;

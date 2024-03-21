@@ -1,66 +1,20 @@
-use std::{
-    collections::BTreeMap,
-    sync::{Arc, RwLock},
-};
+use std::sync::Arc;
 use test_log::test;
-use value_log::{Config, Index, ValueHandle, ValueLog};
-
-type Inner = RwLock<BTreeMap<Arc<[u8]>, ValueHandle>>;
-
-#[derive(Default)]
-pub struct DebugIndex(Inner);
-
-impl std::ops::Deref for DebugIndex {
-    type Target = Inner;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DebugIndex {
-    fn insert_indirection(&self, key: &[u8], value: ValueHandle) -> std::io::Result<()> {
-        self.write()
-            .expect("lock is poisoned")
-            .insert(key.into(), value);
-
-        Ok(())
-    }
-}
-
-impl Index for DebugIndex {
-    fn get(&self, key: &[u8]) -> std::io::Result<Option<ValueHandle>> {
-        Ok(self.read().expect("lock is poisoned").get(key).cloned())
-    }
-}
+use value_log::{Config, MockIndex, ValueHandle, ValueLog};
 
 #[test]
 fn worst_case_space_amp() -> value_log::Result<()> {
     let folder = tempfile::tempdir()?;
 
-    let index = DebugIndex(RwLock::new(BTreeMap::<Arc<[u8]>, ValueHandle>::default()));
+    let index = MockIndex::default();
     let index = Arc::new(index);
 
     let vl_path = folder.path();
     std::fs::create_dir_all(vl_path)?;
     let value_log = ValueLog::open(vl_path, Config::default(), index.clone())?;
 
-    assert_eq!(
-        0.0,
-        value_log
-            .manifest
-            .read()
-            .expect("lock is poisoned")
-            .space_amp()
-    );
-    assert_eq!(
-        0.0,
-        value_log
-            .manifest
-            .read()
-            .expect("lock is poisoned")
-            .stale_ratio()
-    );
+    assert_eq!(0.0, value_log.manifest.space_amp());
+    assert_eq!(0.0, value_log.manifest.stale_ratio());
 
     let key = "key";
     let value = "value";
@@ -78,34 +32,14 @@ fn worst_case_space_amp() -> value_log::Result<()> {
         writer.write(key.as_bytes(), value.as_bytes())?;
         value_log.register(writer)?;
 
-        for id in value_log
-            .manifest
-            .read()
-            .expect("lock is poisoned")
-            .list_segment_ids()
-        {
+        for id in value_log.manifest.list_segment_ids() {
             value_log.refresh_stats(id)?;
         }
 
-        assert_eq!(
-            x as f32,
-            value_log
-                .manifest
-                .read()
-                .expect("lock is poisoned")
-                .space_amp()
-        );
+        assert_eq!(x as f32, value_log.manifest.space_amp());
 
         if x > 1 {
-            assert!(
-                (1.0 - (1.0 / x as f32)
-                    - value_log
-                        .manifest
-                        .read()
-                        .expect("lock is poisoned")
-                        .stale_ratio())
-                    < 0.00001
-            );
+            assert!((1.0 - (1.0 / x as f32) - value_log.manifest.stale_ratio()) < 0.00001);
         }
     }
 
@@ -116,29 +50,15 @@ fn worst_case_space_amp() -> value_log::Result<()> {
 fn no_overlap_space_amp() -> value_log::Result<()> {
     let folder = tempfile::tempdir()?;
 
-    let index = DebugIndex(RwLock::new(BTreeMap::<Arc<[u8]>, ValueHandle>::default()));
+    let index = MockIndex::default();
     let index = Arc::new(index);
 
     let vl_path = folder.path();
     std::fs::create_dir_all(vl_path)?;
     let value_log = ValueLog::open(vl_path, Config::default(), index.clone())?;
 
-    assert_eq!(
-        0.0,
-        value_log
-            .manifest
-            .read()
-            .expect("lock is poisoned")
-            .stale_ratio()
-    );
-    assert_eq!(
-        0.0,
-        value_log
-            .manifest
-            .read()
-            .expect("lock is poisoned")
-            .space_amp()
-    );
+    assert_eq!(0.0, value_log.manifest.stale_ratio());
+    assert_eq!(0.0, value_log.manifest.space_amp());
 
     // NOTE: No blobs overlap, so there are no dead blobs => space amp = 1.0 => perfect space amp
     for i in 0..100 {
@@ -155,31 +75,12 @@ fn no_overlap_space_amp() -> value_log::Result<()> {
         writer.write(key.as_bytes(), value.as_bytes())?;
         value_log.register(writer)?;
 
-        for id in value_log
-            .manifest
-            .read()
-            .expect("lock is poisoned")
-            .list_segment_ids()
-        {
+        for id in value_log.manifest.list_segment_ids() {
             value_log.refresh_stats(id)?;
         }
 
-        assert_eq!(
-            1.0,
-            value_log
-                .manifest
-                .read()
-                .expect("lock is poisoned")
-                .space_amp()
-        );
-        assert_eq!(
-            0.0,
-            value_log
-                .manifest
-                .read()
-                .expect("lock is poisoned")
-                .stale_ratio()
-        );
+        assert_eq!(1.0, value_log.manifest.space_amp());
+        assert_eq!(0.0, value_log.manifest.stale_ratio());
     }
 
     Ok(())

@@ -1,55 +1,12 @@
-use std::{
-    collections::BTreeMap,
-    sync::{Arc, RwLock},
-};
+use std::sync::Arc;
 use test_log::test;
-use value_log::{Config, Index, IndexWriter, ValueHandle, ValueLog};
-
-type Inner = RwLock<BTreeMap<Arc<[u8]>, ValueHandle>>;
-
-#[derive(Default)]
-pub struct DebugIndex(Inner);
-
-impl std::ops::Deref for DebugIndex {
-    type Target = Inner;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DebugIndex {
-    fn insert_indirection(&self, key: &[u8], value: ValueHandle) -> std::io::Result<()> {
-        self.write()
-            .expect("lock is poisoned")
-            .insert(key.into(), value);
-        Ok(())
-    }
-}
-
-impl Index for DebugIndex {
-    fn get(&self, key: &[u8]) -> std::io::Result<Option<ValueHandle>> {
-        Ok(self.read().expect("lock is poisoned").get(key).cloned())
-    }
-}
-
-struct DebugIndexWriter(Arc<DebugIndex>);
-
-impl IndexWriter for DebugIndexWriter {
-    fn insert_indirection(&self, key: &[u8], value: ValueHandle) -> std::io::Result<()> {
-        self.0.insert_indirection(key, value)
-    }
-
-    fn finish(&self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
+use value_log::{Config, MockIndex, MockIndexWriter, ValueHandle, ValueLog};
 
 #[test]
 fn basic_gc() -> value_log::Result<()> {
     let folder = tempfile::tempdir()?;
 
-    let index = DebugIndex(RwLock::new(BTreeMap::<Arc<[u8]>, ValueHandle>::default()));
+    let index = MockIndex::default();
     let index = Arc::new(index);
 
     let vl_path = folder.path();
@@ -77,14 +34,13 @@ fn basic_gc() -> value_log::Result<()> {
     {
         assert_eq!(1, value_log.segment_count());
 
-        let segments = value_log.manifest.read().expect("lock is poisoned");
-        let segments = segments.list_segments();
+        let segments = value_log.manifest.list_segments();
 
         assert_eq!(5, segments.first().unwrap().len());
         assert_eq!(0, segments.first().unwrap().stats.get_stale_items());
     }
 
-    for (key, handle) in index.0.read().unwrap().iter() {
+    for (key, handle) in index.read().unwrap().iter() {
         let item = value_log.get(handle)?.unwrap();
         assert_eq!(item, key.repeat(500).into());
     }
@@ -110,31 +66,26 @@ fn basic_gc() -> value_log::Result<()> {
     {
         assert_eq!(2, value_log.segment_count());
 
-        let segments = value_log.manifest.read().expect("lock is poisoned");
-        let segments = segments.list_segments();
+        let segments = value_log.manifest.list_segments();
 
         assert_eq!(5, segments.first().unwrap().len());
         assert_eq!(0, segments.first().unwrap().stats.get_stale_items());
     }
 
-    for (key, handle) in index.0.read().unwrap().iter() {
+    for (key, handle) in index.read().unwrap().iter() {
         let item = value_log.get(handle)?.unwrap();
         assert_eq!(item, key.repeat(1_000).into());
     }
 
-    let ids = value_log
-        .manifest
-        .read()
-        .expect("lock is poisoned")
-        .list_segment_ids();
+    let ids = value_log.manifest.list_segment_ids();
 
-    value_log.rollover(&ids, &DebugIndexWriter(index.clone()))?;
+    let writer: MockIndexWriter = index.into();
+    value_log.rollover(&ids, &writer)?;
 
     {
         assert_eq!(1, value_log.segment_count());
 
-        let segments = value_log.manifest.read().expect("lock is poisoned");
-        let segments = segments.list_segments();
+        let segments = value_log.manifest.list_segments();
 
         assert_eq!(5, segments.first().unwrap().len());
         assert_eq!(0, segments.first().unwrap().stats.get_stale_items());

@@ -45,6 +45,7 @@ mod handle;
 mod id;
 mod index;
 mod manifest;
+mod mock;
 mod path;
 mod segment;
 mod value_log;
@@ -55,9 +56,12 @@ pub use {
     config::Config,
     error::{Error, Result},
     handle::ValueHandle,
-    index::{Index, Writer as IndexWriter},
+    index::{ExternalIndex, Writer as IndexWriter},
     segment::multi_writer::MultiWriter as SegmentWriter,
     segment::reader::Reader as SegmentReader,
     segment::Segment,
     value_log::ValueLog,
 };
+
+#[doc(hidden)]
+pub use mock::{MockIndex, MockIndexWriter};

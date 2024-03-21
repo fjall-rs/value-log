@@ -4,7 +4,7 @@ use std::{
     fs::File,
     io::Write,
     path::{Path, PathBuf},
-    sync::{atomic::AtomicU64, Arc},
+    sync::{atomic::AtomicU64, Arc, RwLock},
 };
 
 pub const VLOG_MARKER: &str = ".vlog";
@@ -31,9 +31,21 @@ fn rewrite_atomic<P: AsRef<Path>>(path: P, content: &[u8]) -> std::io::Result<()
 }
 
 #[allow(clippy::module_name_repetitions)]
-pub struct SegmentManifest {
+pub struct SegmentManifestInner {
     path: PathBuf,
-    pub(crate) segments: HashMap<SegmentId, Arc<Segment>>,
+    pub(crate) segments: RwLock<HashMap<SegmentId, Arc<Segment>>>,
+}
+
+#[allow(clippy::module_name_repetitions)]
+#[derive(Clone)]
+pub struct SegmentManifest(Arc<SegmentManifestInner>);
+
+impl std::ops::Deref for SegmentManifest {
+    type Target = SegmentManifestInner;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 impl SegmentManifest {
@@ -42,28 +54,49 @@ impl SegmentManifest {
         registered_ids: &[u64],
     ) -> crate::Result<()> {
         // TODO:
+
+        for dirent in std::fs::read_dir(folder)? {
+            let dirent = dirent?;
+
+            if dirent.file_type()?.is_dir() {
+                let segment_id = dirent
+                    .file_name()
+                    .to_str()
+                    .expect("should be valid utf-8")
+                    .parse::<u64>()
+                    .expect("should be valid segment ID");
+
+                if !registered_ids.contains(&segment_id) {
+                    log::trace!("Deleting unfinished v-log segment {segment_id}");
+                    std::fs::remove_dir_all(dirent.path())?;
+                }
+            }
+        }
+
         Ok(())
     }
 
     pub(crate) fn recover<P: AsRef<Path>>(folder: P) -> crate::Result<Self> {
         let folder = folder.as_ref();
         let path = folder.join("segments.json");
+
         log::debug!("Loading value log manifest from {}", path.display());
 
         let str = std::fs::read_to_string(&path)?;
         let ids: Vec<u64> = serde_json::from_str(&str).expect("deserialize error");
 
-        Self::remove_unfinished_segments(folder, &ids)?;
+        let segments_folder = folder.join(SEGMENTS_FOLDER);
+        Self::remove_unfinished_segments(&segments_folder, &ids)?;
 
         let segments = {
-            let mut map = HashMap::default();
+            let mut map = HashMap::with_capacity(100);
 
             for id in ids {
                 map.insert(
                     id,
                     Arc::new(Segment {
                         id,
-                        path: folder.join(SEGMENTS_FOLDER).join(id.to_string()),
+                        path: segments_folder.join(id.to_string()),
                         stats: Stats::default(),
                     }),
                 );
@@ -72,34 +105,39 @@ impl SegmentManifest {
             map
         };
 
-        Ok(Self { path, segments })
+        Ok(Self(Arc::new(SegmentManifestInner {
+            path,
+            segments: RwLock::new(segments),
+        })))
     }
 
     pub(crate) fn create_new<P: AsRef<Path>>(folder: P) -> crate::Result<Self> {
         let path = folder.as_ref().join("segments.json");
 
-        let mut m = Self {
+        let m = Self(Arc::new(SegmentManifestInner {
             path,
-            segments: HashMap::default(),
-        };
-        m.write_to_disk()?;
+            segments: RwLock::new(HashMap::default()),
+        }));
+        Self::write_to_disk(&m.path, &[])?;
 
         Ok(m)
     }
 
-    pub fn drop_segments(&mut self, ids: &[u64]) -> crate::Result<()> {
-        self.segments.retain(|x, _| !ids.contains(x));
-        self.write_to_disk()
+    pub fn drop_segments(&self, ids: &[u64]) -> crate::Result<()> {
+        let mut lock = self.segments.write().expect("lock is poisoned");
+        lock.retain(|x, _| !ids.contains(x));
+        Self::write_to_disk(&self.path, &lock.keys().copied().collect::<Vec<_>>())
     }
 
-    pub fn register(&mut self, writer: MultiWriter) -> crate::Result<()> {
+    pub fn register(&self, writer: MultiWriter) -> crate::Result<()> {
+        let mut lock = self.segments.write().expect("lock is poisoned");
         let writers = writer.finish()?;
 
         for writer in writers {
             let segment_id = writer.segment_id;
             let segment_folder = writer.folder.clone();
 
-            self.segments.insert(
+            lock.insert(
                 segment_id,
                 Arc::new(Segment {
                     id: segment_id,
@@ -114,18 +152,17 @@ impl SegmentManifest {
             );
         }
 
-        self.write_to_disk()
+        Self::write_to_disk(&self.path, &lock.keys().copied().collect::<Vec<_>>())
     }
 
-    pub(crate) fn write_to_disk(&mut self) -> crate::Result<()> {
-        log::trace!("Writing segment manifest to {}", self.path.display());
-
-        let keys: Vec<u64> = self.segments.keys().copied().collect();
+    fn write_to_disk<P: AsRef<Path>>(path: P, segment_ids: &[SegmentId]) -> crate::Result<()> {
+        let path = path.as_ref();
+        log::trace!("Writing segment manifest to {}", path.display());
 
         // NOTE: Serialization can't fail here
         #[allow(clippy::expect_used)]
-        let json = serde_json::to_string_pretty(&keys).expect("should serialize");
-        rewrite_atomic(&self.path, json.as_bytes())?;
+        let json = serde_json::to_string_pretty(&segment_ids).expect("should serialize");
+        rewrite_atomic(path, json.as_bytes())?;
 
         Ok(())
     }
@@ -133,19 +170,39 @@ impl SegmentManifest {
     /// Gets a segment
     #[must_use]
     pub fn get_segment(&self, id: SegmentId) -> Option<Arc<Segment>> {
-        self.segments.get(&id).cloned()
+        self.segments
+            .read()
+            .expect("lock is poisoned")
+            .get(&id)
+            .cloned()
     }
 
     /// Lists all segment IDs
     #[must_use]
     pub fn list_segment_ids(&self) -> Vec<SegmentId> {
-        self.segments.keys().copied().collect()
+        self.segments
+            .read()
+            .expect("lock is poisoned")
+            .keys()
+            .copied()
+            .collect()
+    }
+
+    /// Counts segments
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.segments.read().expect("lock is poisoned").len()
     }
 
     /// Lists all segments
     #[must_use]
     pub fn list_segments(&self) -> Vec<Arc<Segment>> {
-        self.segments.values().cloned().collect()
+        self.segments
+            .read()
+            .expect("lock is poisoned")
+            .values()
+            .cloned()
+            .collect()
     }
 
     /// Returns the amount of bytes on disk that are occupied by blobs.
@@ -154,6 +211,8 @@ impl SegmentManifest {
     #[must_use]
     pub fn disk_space_used(&self) -> u64 {
         self.segments
+            .read()
+            .expect("lock is poisoned")
             .values()
             .map(|x| x.stats.total_bytes())
             .sum::<u64>()
@@ -166,6 +225,8 @@ impl SegmentManifest {
     #[must_use]
     pub fn reclaimable_bytes(&self) -> u64 {
         self.segments
+            .read()
+            .expect("lock is poisoned")
             .values()
             .map(|x| x.stats.get_stale_bytes())
             .sum::<u64>()
@@ -177,6 +238,8 @@ impl SegmentManifest {
     #[must_use]
     pub fn stale_items_count(&self) -> u64 {
         self.segments
+            .read()
+            .expect("lock is poisoned")
             .values()
             .map(|x| x.stats.get_stale_items())
             .sum::<u64>()
@@ -189,6 +252,8 @@ impl SegmentManifest {
     pub fn stale_ratio(&self) -> f32 {
         let used_bytes = self
             .segments
+            .read()
+            .expect("lock is poisoned")
             .values()
             .map(|x| x.stats.total_bytes())
             .sum::<u64>();
@@ -198,6 +263,8 @@ impl SegmentManifest {
 
         let stale_bytes = self
             .segments
+            .read()
+            .expect("lock is poisoned")
             .values()
             .map(|x| x.stats.get_stale_bytes())
             .sum::<u64>();
@@ -217,6 +284,8 @@ impl SegmentManifest {
     pub fn space_amp(&self) -> f32 {
         let used_bytes = self
             .segments
+            .read()
+            .expect("lock is poisoned")
             .values()
             .map(|x| x.stats.total_bytes())
             .sum::<u64>();
@@ -226,6 +295,8 @@ impl SegmentManifest {
 
         let stale_bytes = self
             .segments
+            .read()
+            .expect("lock is poisoned")
             .values()
             .map(|x| x.stats.get_stale_bytes())
             .sum::<u64>();

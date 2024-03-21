@@ -3,8 +3,8 @@ use std::io::Cursor;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Version {
-    // V0,
-    V1,
+    V0,
+    // V1,
 }
 
 impl std::fmt::Display for Version {
@@ -16,8 +16,8 @@ impl std::fmt::Display for Version {
 impl From<Version> for u16 {
     fn from(value: Version) -> Self {
         match value {
-            // Version::V0 => 0,
-            Version::V1 => 1,
+            Version::V0 => 0,
+            // Version::V1 => 1,
         }
     }
 }
@@ -26,8 +26,8 @@ impl TryFrom<u16> for Version {
     type Error = ();
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match value {
-            // 0 => Ok(Self::V0),
-            1 => Ok(Self::V1),
+            0 => Ok(Self::V0),
+            // 1 => Ok(Self::V1),
             _ => Err(()),
         }
     }
@@ -79,17 +79,17 @@ mod tests {
     #[allow(clippy::expect_used)]
     pub fn version_round_trip() {
         let mut buf = vec![];
-        Version::V1.write_file_header(&mut buf).expect("can't fail");
+        Version::V0.write_file_header(&mut buf).expect("can't fail");
 
         let version = Version::parse_file_header(&buf).expect("should parse");
-        assert_eq!(version, Version::V1);
+        assert_eq!(version, Version::V0);
     }
 
     #[test]
     #[allow(clippy::expect_used)]
     pub fn test_version_len() {
         let mut buf = vec![];
-        let size = Version::V1.write_file_header(&mut buf).expect("can't fail");
+        let size = Version::V0.write_file_header(&mut buf).expect("can't fail");
 
         assert_eq!(Version::len() as usize, size);
     }

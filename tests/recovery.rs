@@ -1,44 +1,12 @@
-use std::{
-    collections::BTreeMap,
-    sync::{Arc, RwLock},
-};
+use std::sync::Arc;
 use test_log::test;
-use value_log::{Config, Index, ValueHandle, ValueLog};
-
-type Inner = RwLock<BTreeMap<Arc<[u8]>, ValueHandle>>;
-
-#[derive(Default)]
-pub struct DebugIndex(Inner);
-
-impl std::ops::Deref for DebugIndex {
-    type Target = Inner;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DebugIndex {
-    fn insert_indirection(&self, key: &[u8], value: ValueHandle) -> std::io::Result<()> {
-        self.write()
-            .expect("lock is poisoned")
-            .insert(key.into(), value);
-
-        Ok(())
-    }
-}
-
-impl Index for DebugIndex {
-    fn get(&self, key: &[u8]) -> std::io::Result<Option<ValueHandle>> {
-        Ok(self.read().expect("lock is poisoned").get(key).cloned())
-    }
-}
+use value_log::{Config, MockIndex, ValueHandle, ValueLog};
 
 #[test]
-fn basic_kv() -> value_log::Result<()> {
+fn basic_recovery() -> value_log::Result<()> {
     let folder = tempfile::tempdir()?;
 
-    let index = DebugIndex(RwLock::new(BTreeMap::<Arc<[u8]>, ValueHandle>::default()));
+    let index = MockIndex::default();
     let index = Arc::new(index);
 
     let vl_path = folder.path();
@@ -68,14 +36,13 @@ fn basic_kv() -> value_log::Result<()> {
         {
             assert_eq!(1, value_log.segment_count());
 
-            let segments = value_log.manifest.read().expect("lock is poisoned");
-            let segments = segments.list_segments();
+            let segments = value_log.manifest.list_segments();
 
             assert_eq!(items.len() as u64, segments.first().unwrap().len());
             assert_eq!(0, segments.first().unwrap().stats.get_stale_items());
         }
 
-        for (key, handle) in index.0.read().unwrap().iter() {
+        for (key, handle) in index.read().unwrap().iter() {
             let item = value_log.get(handle)?.unwrap();
             assert_eq!(item, key.repeat(1_000).into());
         }
@@ -84,20 +51,51 @@ fn basic_kv() -> value_log::Result<()> {
     {
         let value_log = ValueLog::open(vl_path, Config::default(), index.clone())?;
 
+        // TODO: should be recovered
+        for id in value_log.manifest.list_segment_ids() {
+            value_log.refresh_stats(id)?;
+        }
+
         {
             assert_eq!(1, value_log.segment_count());
 
-            let segments = value_log.manifest.read().expect("lock is poisoned");
-            let segments = segments.list_segments();
+            let segments = value_log.manifest.list_segments();
 
             assert_eq!(items.len() as u64, segments.first().unwrap().len());
             assert_eq!(0, segments.first().unwrap().stats.get_stale_items());
         }
 
-        for (key, handle) in index.0.read().unwrap().iter() {
+        for (key, handle) in index.read().unwrap().iter() {
             let item = value_log.get(handle)?.unwrap();
             assert_eq!(item, key.repeat(1_000).into());
         }
+    }
+
+    Ok(())
+}
+
+#[test]
+fn delete_unfinished_segment_folders() -> value_log::Result<()> {
+    let folder = tempfile::tempdir()?;
+
+    let index = MockIndex::default();
+    let index = Arc::new(index);
+
+    let vl_path = folder.path();
+    std::fs::create_dir_all(vl_path)?;
+
+    let mock_path = vl_path.join("segments").join("463298");
+    std::fs::create_dir_all(&mock_path)?;
+    assert!(mock_path.try_exists()?);
+
+    {
+        let _value_log = ValueLog::open(vl_path, Config::default(), index.clone())?;
+        assert!(mock_path.try_exists()?);
+    }
+
+    {
+        let _value_log = ValueLog::open(vl_path, Config::default(), index.clone())?;
+        assert!(!mock_path.try_exists()?);
     }
 
     Ok(())

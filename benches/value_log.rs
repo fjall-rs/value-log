@@ -1,30 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use rand::RngCore;
-use std::{
-    collections::BTreeMap,
-    sync::{Arc, RwLock},
-};
-use value_log::{BlobCache, Config, Index, ValueHandle, ValueLog};
-
-#[derive(Default)]
-pub struct DebugIndex(RwLock<BTreeMap<Arc<[u8]>, ValueHandle>>);
-
-impl DebugIndex {
-    fn insert_indirection(&self, key: &[u8], value: ValueHandle) -> std::io::Result<()> {
-        self.0
-            .write()
-            .expect("lock is poisoned")
-            .insert(key.into(), value);
-
-        Ok(())
-    }
-}
-
-impl Index for DebugIndex {
-    fn get(&self, key: &[u8]) -> std::io::Result<Option<ValueHandle>> {
-        Ok(self.0.read().expect("lock is poisoned").get(key).cloned())
-    }
-}
+use std::sync::Arc;
+use value_log::{BlobCache, Config, ExternalIndex, MockIndex, ValueHandle, ValueLog};
 
 fn load_value(c: &mut Criterion) {
     let mut group = c.benchmark_group("load blob");
@@ -44,7 +21,7 @@ fn load_value(c: &mut Criterion) {
     ];
 
     {
-        let index = DebugIndex(RwLock::new(BTreeMap::<Arc<[u8]>, ValueHandle>::default()));
+        let index = MockIndex::default();
         let index = Arc::new(index);
 
         let folder = tempfile::tempdir().unwrap();
@@ -91,7 +68,7 @@ fn load_value(c: &mut Criterion) {
     }
 
     {
-        let index = DebugIndex(RwLock::new(BTreeMap::<Arc<[u8]>, ValueHandle>::default()));
+        let index = MockIndex::default();
         let index = Arc::new(index);
 
         let folder = tempfile::tempdir().unwrap();
@@ -145,7 +122,7 @@ fn load_value(c: &mut Criterion) {
 fn compression(c: &mut Criterion) {
     let mut group = c.benchmark_group("compression");
 
-    let index = DebugIndex(RwLock::new(BTreeMap::<Arc<[u8]>, ValueHandle>::default()));
+    let index = MockIndex::default();
     let index = Arc::new(index);
 
     let folder = tempfile::tempdir().unwrap();

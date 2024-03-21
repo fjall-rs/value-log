@@ -6,14 +6,14 @@ use crate::{
     path::absolute_path,
     segment::merge::MergeReader,
     version::Version,
-    Config, Index, SegmentWriter, ValueHandle,
+    Config, ExternalIndex, SegmentWriter, ValueHandle,
 };
 use byteorder::{BigEndian, ReadBytesExt};
 use std::{
     fs::File,
     io::{BufReader, Read, Seek},
     path::PathBuf,
-    sync::{Arc, Mutex, RwLock},
+    sync::{Arc, Mutex},
 };
 
 /// A disk-resident value log
@@ -35,13 +35,13 @@ pub struct ValueLogInner {
     path: PathBuf,
 
     /// External index
-    pub index: Arc<dyn Index + Send + Sync>,
+    pub index: Arc<dyn ExternalIndex + Send + Sync>,
 
     /// In-memory blob cache
     blob_cache: Arc<BlobCache>,
 
     /// Segment manifest
-    pub manifest: RwLock<SegmentManifest>,
+    pub manifest: SegmentManifest,
 
     id_generator: IdGenerator,
 
@@ -55,9 +55,9 @@ impl ValueLog {
     ///
     /// Will return `Err` if an IO error occurs.
     pub fn open<P: Into<PathBuf>>(
-        path: P,
+        path: P, // TODO: move path into config?
         config: Config,
-        index: Arc<dyn Index + Send + Sync>,
+        index: Arc<dyn ExternalIndex + Send + Sync>,
     ) -> crate::Result<Self> {
         let path = path.into();
 
@@ -72,7 +72,7 @@ impl ValueLog {
     pub(crate) fn create_new<P: Into<PathBuf>>(
         path: P,
         config: Config,
-        index: Arc<dyn Index + Send + Sync>,
+        index: Arc<dyn ExternalIndex + Send + Sync>,
     ) -> crate::Result<Self> {
         let path = absolute_path(path.into());
         log::trace!("Creating value-log at {}", path.display());
@@ -88,7 +88,7 @@ impl ValueLog {
         // -> the V-log is fully initialized
 
         let mut file = std::fs::File::create(marker_path)?;
-        Version::V1.write_file_header(&mut file)?;
+        Version::V0.write_file_header(&mut file)?;
         file.sync_all()?;
 
         #[cfg(not(target_os = "windows"))]
@@ -110,7 +110,7 @@ impl ValueLog {
             path,
             blob_cache,
             index,
-            manifest: RwLock::new(manifest),
+            manifest,
             id_generator: IdGenerator::default(),
             rollover_guard: Mutex::new(()),
         })))
@@ -119,7 +119,7 @@ impl ValueLog {
     pub(crate) fn recover<P: Into<PathBuf>>(
         path: P,
         config: Config,
-        index: Arc<dyn Index + Send + Sync>,
+        index: Arc<dyn ExternalIndex + Send + Sync>,
     ) -> crate::Result<Self> {
         let path = path.into();
         log::info!("Recovering value-log at {}", path.display());
@@ -128,7 +128,7 @@ impl ValueLog {
             let bytes = std::fs::read(path.join(VLOG_MARKER))?;
 
             if let Some(version) = Version::parse_file_header(&bytes) {
-                if version != Version::V1 {
+                if version != Version::V0 {
                     return Err(crate::Error::InvalidVersion(Some(version)));
                 }
             } else {
@@ -144,27 +144,25 @@ impl ValueLog {
             path,
             blob_cache,
             index,
-            manifest: RwLock::new(manifest),
+            manifest,
             id_generator: IdGenerator::default(),
             rollover_guard: Mutex::new(()),
         })))
     }
 
     /// Registers writer
+    ///
+    /// # Errors
+    ///
+    /// Will return `Err` if an IO error occurs.
     pub fn register(&self, writer: SegmentWriter) -> crate::Result<()> {
-        self.manifest
-            .write()
-            .expect("lock is poisoned")
-            .register(writer)
+        self.manifest.register(writer)
     }
 
     /// Returns segment count
+    #[must_use]
     pub fn segment_count(&self) -> usize {
-        self.manifest
-            .read()
-            .expect("lock is poisoned")
-            .segments
-            .len()
+        self.manifest.len()
     }
 
     /// Resolves a value handle
@@ -173,12 +171,7 @@ impl ValueLog {
     ///
     /// Will return `Err` if an IO error occurs.
     pub fn get(&self, handle: &ValueHandle) -> crate::Result<Option<Arc<[u8]>>> {
-        let Some(segment) = self
-            .manifest
-            .read()
-            .expect("lock is poisoned")
-            .get_segment(handle.segment_id)
-        else {
+        let Some(segment) = self.manifest.get_segment(handle.segment_id) else {
             return Ok(None);
         };
 
@@ -229,12 +222,7 @@ impl ValueLog {
     ///
     /// Will return `Err` if an IO error occurs.
     pub fn refresh_stats(&self, segment_id: SegmentId) -> std::io::Result<()> {
-        let Some(segment) = self
-            .manifest
-            .read()
-            .expect("lock is poisoned")
-            .get_segment(segment_id)
-        else {
+        let Some(segment) = self.manifest.get_segment(segment_id) else {
             return Ok(());
         };
 
@@ -290,6 +278,23 @@ impl ValueLog {
         Ok(())
     }
 
+    /// Drops stale segments
+    pub fn drop_stale_segments(&self) -> crate::Result<()> {
+        let ids = self
+            .manifest
+            .segments
+            .read()
+            .expect("lock is poisoned")
+            .values()
+            .filter(|x| x.stats.is_stale())
+            .map(|x| x.id)
+            .collect::<Vec<_>>();
+
+        self.manifest.drop_segments(&ids)?;
+
+        Ok(())
+    }
+
     /// Rewrites some segments into new segment(s), blocking the caller
     /// until the operation is completely done.
     ///
@@ -304,14 +309,10 @@ impl ValueLog {
         // IMPORTANT: Only allow 1 rollover at any given time
         let _guard = self.rollover_guard.lock().expect("lock is poisoned");
 
-        let lock = self.manifest.read().expect("lock is poisoned");
-
         let segments = ids
             .iter()
-            .map(|x| lock.segments.get(x).cloned())
+            .map(|&x| self.manifest.get_segment(x))
             .collect::<Option<Vec<_>>>();
-
-        drop(lock);
 
         let Some(segments) = segments else {
             return Ok(());
@@ -341,11 +342,15 @@ impl ValueLog {
             writer.write(&k, &v)?;
         }
 
-        let mut manifest = self.manifest.write().expect("lock is poisoned");
+        // IMPORTANT: New segments need to be persisted before adding to index
+        // to avoid dangling pointers
+        self.manifest.register(writer)?;
 
-        manifest.register(writer)?;
         index_writer.finish()?;
-        manifest.drop_segments(ids)?;
+
+        // IMPORTANT: Only once pointers are rewritten is it safe to drop old segments
+        // as we are now sure there are no more references
+        self.manifest.drop_segments(ids)?;
 
         Ok(())
     }

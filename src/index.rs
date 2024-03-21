@@ -3,7 +3,8 @@ use crate::ValueHandle;
 /// External index trait
 ///
 /// An index should point into the value log using [`ValueHandle`].
-pub trait Index {
+#[allow(clippy::module_name_repetitions)]
+pub trait ExternalIndex {
     /// Returns a value handle for a given key.
     ///
     /// This method is used to index back into the index to check for
