@@ -18,7 +18,7 @@
 //! As data changes, old values will unnecessarily occupy disk space. As space amplification
 //! increases, stale data needs to be discarded by rewriting old segments (garbage collection).
 //!
-//! While segments are internally sorted, which may help with range scans, data may not be stored
+//! Even though segments are internally sorted, which may help with range scans, data may not be stored
 //! contiguously, which hurts read performance of ranges. Point reads also require an extra level of
 //! indirection, as the value handle needs to be retrieved from the index. However, this index is generally
 //! small, so ideally it can be cached efficiently.
@@ -27,8 +27,8 @@
 //! amplification when storing large blobs.
 //!
 //! Use a value log, when:
-//! - you are storing large values (HTML pages, big JSON, small images, ...)
-//! - your data is rarely deleted, or you do not have strict disk space requirements
+//! - you are storing large values (HTML pages, big JSON, small images, archiving, ...)
+//! - your data is rarely deleted or updated, or you do not have strict disk space requirements
 //! - your access pattern is point read heavy
 
 #![forbid(unsafe_code)]
