@@ -2,7 +2,6 @@ use crate::{id::SegmentId, segment::stats::Stats, Segment, SegmentWriter as Mult
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::{
     collections::HashMap,
-    fs::File,
     io::{Cursor, Write},
     path::{Path, PathBuf},
     sync::{atomic::AtomicU64, Arc, RwLock},
@@ -25,7 +24,7 @@ fn rewrite_atomic<P: AsRef<Path>>(path: P, content: &[u8]) -> std::io::Result<()
     {
         // TODO: Not sure if the fsync is really required, but just for the sake of it...
         // TODO: also not sure why it fails on Windows...
-        let file = File::open(path)?;
+        let file = std::fs::File::open(path)?;
         file.sync_all()?;
     }
 
