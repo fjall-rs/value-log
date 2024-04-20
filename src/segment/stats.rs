@@ -1,7 +1,7 @@
-use serde::{Deserialize, Serialize};
 use std::sync::atomic::AtomicU64;
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Stats {
     pub(crate) item_count: AtomicU64,
     pub(crate) stale_items: AtomicU64,

@@ -8,9 +8,9 @@ pub enum Error {
 
     /// Invalid data format version
     InvalidVersion(Option<Version>),
-
-    /// CRC check failed
-    CrcMismatch,
+    // TODO:
+    // /// CRC check failed
+    // CrcMismatch,
 }
 
 impl std::fmt::Display for Error {

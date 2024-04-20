@@ -1,14 +1,16 @@
 use crate::{id::SegmentId, segment::stats::Stats, Segment, SegmentWriter as MultiWriter};
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::{
     collections::HashMap,
     fs::File,
-    io::Write,
+    io::{Cursor, Write},
     path::{Path, PathBuf},
     sync::{atomic::AtomicU64, Arc, RwLock},
 };
 
 pub const VLOG_MARKER: &str = ".vlog";
 pub const SEGMENTS_FOLDER: &str = "segments";
+const MANIFEST_FILE: &str = "vlog_manifest";
 
 /// Atomically rewrites a file
 fn rewrite_atomic<P: AsRef<Path>>(path: P, content: &[u8]) -> std::io::Result<()> {
@@ -53,8 +55,6 @@ impl SegmentManifest {
         folder: P,
         registered_ids: &[u64],
     ) -> crate::Result<()> {
-        // TODO:
-
         for dirent in std::fs::read_dir(folder)? {
             let dirent = dirent?;
 
@@ -76,14 +76,32 @@ impl SegmentManifest {
         Ok(())
     }
 
+    /// Parses segment IDs from manifest file
+    fn load_ids_from_disk<P: AsRef<Path>>(path: P) -> crate::Result<Vec<SegmentId>> {
+        let path = path.as_ref();
+        log::debug!("Loading manifest from {}", path.display());
+
+        let bytes = std::fs::read(path)?;
+
+        let mut ids = vec![];
+
+        let mut cursor = Cursor::new(bytes);
+
+        let cnt = cursor.read_u64::<BigEndian>()?;
+
+        for _ in 0..cnt {
+            ids.push(cursor.read_u64::<BigEndian>()?);
+        }
+
+        Ok(ids)
+    }
+
+    /// Recovers a value log from disk
     pub(crate) fn recover<P: AsRef<Path>>(folder: P) -> crate::Result<Self> {
         let folder = folder.as_ref();
-        let path = folder.join("segments.json");
+        let path = folder.join(MANIFEST_FILE);
 
-        log::debug!("Loading value log manifest from {}", path.display());
-
-        let str = std::fs::read_to_string(&path)?;
-        let ids: Vec<u64> = serde_json::from_str(&str).expect("deserialize error");
+        let ids = Self::load_ids_from_disk(&path)?;
 
         let segments_folder = folder.join(SEGMENTS_FOLDER);
         Self::remove_unfinished_segments(&segments_folder, &ids)?;
@@ -112,7 +130,7 @@ impl SegmentManifest {
     }
 
     pub(crate) fn create_new<P: AsRef<Path>>(folder: P) -> crate::Result<Self> {
-        let path = folder.as_ref().join("segments.json");
+        let path = folder.as_ref().join(MANIFEST_FILE);
 
         let m = Self(Arc::new(SegmentManifestInner {
             path,
@@ -159,10 +177,16 @@ impl SegmentManifest {
         let path = path.as_ref();
         log::trace!("Writing segment manifest to {}", path.display());
 
-        // NOTE: Serialization can't fail here
-        #[allow(clippy::expect_used)]
-        let json = serde_json::to_string_pretty(&segment_ids).expect("should serialize");
-        rewrite_atomic(path, json.as_bytes())?;
+        let mut bytes = Vec::new();
+
+        let cnt = segment_ids.len() as u64;
+        bytes.write_u64::<BigEndian>(cnt)?;
+
+        for id in segment_ids {
+            bytes.write_u64::<BigEndian>(*id)?;
+        }
+
+        rewrite_atomic(path, &bytes)?;
 
         Ok(())
     }

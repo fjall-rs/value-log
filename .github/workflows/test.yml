@@ -13,7 +13,7 @@ env:
 
 jobs:
   test:
-    timeout-minutes: 20
+    timeout-minutes: 10
     strategy:
       matrix:
         rust_version:
@@ -38,8 +38,10 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           prefix-key: ${{ runner.os }}-cargo
+      - name: Install cargo-all-features
+        run: cargo install cargo-all-features
       - name: Build
-        run: cargo build -v
+        run: cargo build-all-features
       - name: Format
         run: cargo fmt --all -- --check
       - name: Clippy
@@ -49,7 +51,7 @@ jobs:
         env:
           RUST_LOG: debug
   cross:
-    timeout-minutes: 20
+    timeout-minutes: 10
     name: cross
     strategy:
       matrix:
