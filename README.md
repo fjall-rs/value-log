@@ -25,14 +25,6 @@ All source code is licensed under MIT OR Apache-2.0.
 
 All contributions are to be licensed as MIT OR Apache-2.0.
 
-## Development
-
-### Run benchmarks
-
-```bash
-cargo bench --features bloom
-```
-
 ## Footnotes
 
 [1] https://github.com/facebook/rocksdb/wiki/BlobDB
