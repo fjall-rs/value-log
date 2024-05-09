@@ -1,3 +1,8 @@
+[![CI](https://github.com/fjall-rs/value-log/actions/workflows/test.yml/badge.svg)](https://github.com/fjall-rs/value-log/actions/workflows/test.yml)
+[![docs.rs](https://img.shields.io/docsrs/value-log?color=green)](https://docs.rs/value-log)
+[![Crates.io](https://img.shields.io/crates/v/value-log?color=blue)](https://crates.io/crates/value-log)
+![MSRV](https://img.shields.io/badge/MSRV-1.74.0-blue)
+
 # value-log
 
 Generic value log implementation for key-value separated storage, inspired by RocksDB's BlobDB [[1]](#footnotes) and implemented in safe, stable Rust.
