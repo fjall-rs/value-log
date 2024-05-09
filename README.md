@@ -7,7 +7,7 @@
 
 Generic value log implementation for key-value separated storage, inspired by RocksDB's BlobDB [[1]](#footnotes) and implemented in safe, stable Rust.
 
-> This crate is intended as a building block for key-value separated LSM storage.
+> This crate is intended as a building block for key-value separated storage.
 > You probably want to use https://github.com/fjall-rs/fjall instead.
 
 ## Features
