@@ -319,7 +319,7 @@ impl<I: ExternalIndex + Clone + Send + Sync> ValueLog<I> {
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    pub fn rollover<W: IndexWriter>(&self, ids: &[u64], index_writer: &W) -> crate::Result<()> {
+    pub fn rollover<W: IndexWriter>(&self, ids: &[u64], index_writer: &mut W) -> crate::Result<()> {
         // IMPORTANT: Only allow 1 rollover at any given time
         let _guard = self.rollover_guard.lock().expect("lock is poisoned");
 

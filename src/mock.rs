@@ -47,11 +47,11 @@ impl From<MockIndex> for MockIndexWriter {
 }
 
 impl IndexWriter for MockIndexWriter {
-    fn insert_indirection(&self, key: &[u8], value: ValueHandle) -> std::io::Result<()> {
+    fn insert_indirection(&mut self, key: &[u8], value: ValueHandle) -> std::io::Result<()> {
         self.0.insert_indirection(key, value)
     }
 
-    fn finish(&self) -> std::io::Result<()> {
+    fn finish(&mut self) -> std::io::Result<()> {
         Ok(())
     }
 }

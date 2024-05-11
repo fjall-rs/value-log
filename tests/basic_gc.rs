@@ -77,8 +77,8 @@ fn basic_gc() -> value_log::Result<()> {
 
     let ids = value_log.manifest.list_segment_ids();
 
-    let writer: MockIndexWriter = index.into();
-    value_log.rollover(&ids, &writer)?;
+    let mut writer: MockIndexWriter = index.into();
+    value_log.rollover(&ids, &mut writer)?;
     value_log.drop_stale_segments()?;
 
     {

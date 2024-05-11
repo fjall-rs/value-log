@@ -44,11 +44,11 @@ impl From<DebugIndex> for DebugIndexWriter {
 }
 
 impl IndexWriter for DebugIndexWriter {
-    fn insert_indirection(&self, key: &[u8], value: ValueHandle) -> std::io::Result<()> {
+    fn insert_indirection(&mut self, key: &[u8], value: ValueHandle) -> std::io::Result<()> {
         self.0.insert_indirection(key, value)
     }
 
-    fn finish(&self) -> std::io::Result<()> {
+    fn finish(&mut self) -> std::io::Result<()> {
         Err(std::io::Error::new(std::io::ErrorKind::Other, "Oh no"))
     }
 }
@@ -94,7 +94,8 @@ fn rollover_index_fail_finish() -> value_log::Result<()> {
         0.0
     );
 
-    let result = value_log.rollover(&[0], &DebugIndexWriter(index.clone()));
+    let mut writer = DebugIndexWriter(index.clone());
+    let result = value_log.rollover(&[0], &mut writer);
     assert!(result.is_err());
 
     assert_eq!(
