@@ -251,7 +251,7 @@ impl SegmentManifest {
             .read()
             .expect("lock is poisoned")
             .values()
-            .map(|x| x.stats.get_stale_bytes())
+            .map(|x| x.stats.stale_bytes())
             .sum::<u64>()
     }
 
@@ -264,7 +264,7 @@ impl SegmentManifest {
             .read()
             .expect("lock is poisoned")
             .values()
-            .map(|x| x.stats.get_stale_items())
+            .map(|x| x.stats.stale_items())
             .sum::<u64>()
     }
 
@@ -289,7 +289,7 @@ impl SegmentManifest {
             .read()
             .expect("lock is poisoned")
             .values()
-            .map(|x| x.stats.get_stale_bytes())
+            .map(|x| x.stats.stale_bytes())
             .sum::<u64>();
         if stale_bytes == 0 {
             return 0.0;
@@ -321,7 +321,7 @@ impl SegmentManifest {
             .read()
             .expect("lock is poisoned")
             .values()
-            .map(|x| x.stats.get_stale_bytes())
+            .map(|x| x.stats.stale_bytes())
             .sum::<u64>();
 
         let alive_bytes = used_bytes - stale_bytes;

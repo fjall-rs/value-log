@@ -6,8 +6,8 @@ use value_log::{Config, ExternalIndex, IndexWriter, ValueHandle, ValueLog};
 
 type DebugIndexInner = RwLock<BTreeMap<Arc<[u8]>, ValueHandle>>;
 
-#[derive(Default)]
-pub struct DebugIndex(DebugIndexInner);
+#[derive(Clone, Default)]
+pub struct DebugIndex(Arc<DebugIndexInner>);
 
 impl std::ops::Deref for DebugIndex {
     type Target = DebugIndexInner;
@@ -35,10 +35,10 @@ impl ExternalIndex for DebugIndex {
 
 /// Used for tests only
 #[allow(clippy::module_name_repetitions)]
-pub struct DebugIndexWriter(Arc<DebugIndex>);
+pub struct DebugIndexWriter(DebugIndex);
 
-impl From<Arc<DebugIndex>> for DebugIndexWriter {
-    fn from(value: Arc<DebugIndex>) -> Self {
+impl From<DebugIndex> for DebugIndexWriter {
+    fn from(value: DebugIndex) -> Self {
         Self(value)
     }
 }
@@ -57,8 +57,7 @@ impl IndexWriter for DebugIndexWriter {
 fn rollover_index_fail_finish() -> value_log::Result<()> {
     let folder = tempfile::tempdir()?;
 
-    let index = DebugIndex(RwLock::new(BTreeMap::<Arc<[u8]>, ValueHandle>::default()));
-    let index = Arc::new(index);
+    let index = DebugIndex(RwLock::new(BTreeMap::<Arc<[u8]>, ValueHandle>::default()).into());
 
     let vl_path = folder.path();
     std::fs::create_dir_all(vl_path)?;

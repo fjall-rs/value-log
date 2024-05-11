@@ -22,7 +22,6 @@ fn load_value(c: &mut Criterion) {
 
     {
         let index = MockIndex::default();
-        let index = Arc::new(index);
 
         let folder = tempfile::tempdir().unwrap();
         let vl_path = folder.path();
@@ -69,7 +68,6 @@ fn load_value(c: &mut Criterion) {
 
     {
         let index = MockIndex::default();
-        let index = Arc::new(index);
 
         let folder = tempfile::tempdir().unwrap();
         let vl_path = folder.path();
@@ -123,7 +121,6 @@ fn compression(c: &mut Criterion) {
     let mut group = c.benchmark_group("compression");
 
     let index = MockIndex::default();
-    let index = Arc::new(index);
 
     let folder = tempfile::tempdir().unwrap();
     let vl_path = folder.path();

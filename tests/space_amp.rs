@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use test_log::test;
 use value_log::{Config, MockIndex, ValueHandle, ValueLog};
 
@@ -7,7 +6,6 @@ fn worst_case_space_amp() -> value_log::Result<()> {
     let folder = tempfile::tempdir()?;
 
     let index = MockIndex::default();
-    let index = Arc::new(index);
 
     let vl_path = folder.path();
     std::fs::create_dir_all(vl_path)?;
@@ -51,7 +49,6 @@ fn no_overlap_space_amp() -> value_log::Result<()> {
     let folder = tempfile::tempdir()?;
 
     let index = MockIndex::default();
-    let index = Arc::new(index);
 
     let vl_path = folder.path();
     std::fs::create_dir_all(vl_path)?;

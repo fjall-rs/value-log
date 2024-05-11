@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use test_log::test;
 use value_log::{Config, MockIndex, ValueHandle, ValueLog};
 
@@ -7,7 +6,6 @@ fn basic_kv() -> value_log::Result<()> {
     let folder = tempfile::tempdir()?;
 
     let index = MockIndex::default();
-    let index = Arc::new(index);
 
     let vl_path = folder.path();
     std::fs::create_dir_all(vl_path)?;
@@ -37,7 +35,7 @@ fn basic_kv() -> value_log::Result<()> {
         let segments = value_log.manifest.list_segments();
 
         assert_eq!(items.len() as u64, segments.first().unwrap().len());
-        assert_eq!(0, segments.first().unwrap().stats.get_stale_items());
+        assert_eq!(0, segments.first().unwrap().stats.stale_items());
     }
 
     for (key, handle) in index.read().unwrap().iter() {

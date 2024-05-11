@@ -8,8 +8,8 @@ type MockIndexInner = RwLock<BTreeMap<Arc<[u8]>, ValueHandle>>;
 
 /// Mock in-memory index
 #[allow(clippy::module_name_repetitions)]
-#[derive(Default)]
-pub struct MockIndex(MockIndexInner);
+#[derive(Clone, Default)]
+pub struct MockIndex(Arc<MockIndexInner>);
 
 impl std::ops::Deref for MockIndex {
     type Target = MockIndexInner;
@@ -38,10 +38,10 @@ impl ExternalIndex for MockIndex {
 
 /// Used for tests only
 #[allow(clippy::module_name_repetitions)]
-pub struct MockIndexWriter(Arc<MockIndex>);
+pub struct MockIndexWriter(MockIndex);
 
-impl From<Arc<MockIndex>> for MockIndexWriter {
-    fn from(value: Arc<MockIndex>) -> Self {
+impl From<MockIndex> for MockIndexWriter {
+    fn from(value: MockIndex) -> Self {
         Self(value)
     }
 }

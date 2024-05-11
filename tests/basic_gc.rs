@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use test_log::test;
 use value_log::{Config, MockIndex, MockIndexWriter, ValueHandle, ValueLog};
 
@@ -7,7 +6,6 @@ fn basic_gc() -> value_log::Result<()> {
     let folder = tempfile::tempdir()?;
 
     let index = MockIndex::default();
-    let index = Arc::new(index);
 
     let vl_path = folder.path();
     std::fs::create_dir_all(vl_path)?;
@@ -37,7 +35,7 @@ fn basic_gc() -> value_log::Result<()> {
         let segments = value_log.manifest.list_segments();
 
         assert_eq!(5, segments.first().unwrap().len());
-        assert_eq!(0, segments.first().unwrap().stats.get_stale_items());
+        assert_eq!(0, segments.first().unwrap().stats.stale_items());
     }
 
     for (key, handle) in index.read().unwrap().iter() {
@@ -69,7 +67,7 @@ fn basic_gc() -> value_log::Result<()> {
         let segments = value_log.manifest.list_segments();
 
         assert_eq!(5, segments.first().unwrap().len());
-        assert_eq!(0, segments.first().unwrap().stats.get_stale_items());
+        assert_eq!(0, segments.first().unwrap().stats.stale_items());
     }
 
     for (key, handle) in index.read().unwrap().iter() {
@@ -81,6 +79,7 @@ fn basic_gc() -> value_log::Result<()> {
 
     let writer: MockIndexWriter = index.into();
     value_log.rollover(&ids, &writer)?;
+    value_log.drop_stale_segments()?;
 
     {
         assert_eq!(1, value_log.segment_count());
@@ -88,7 +87,7 @@ fn basic_gc() -> value_log::Result<()> {
         let segments = value_log.manifest.list_segments();
 
         assert_eq!(5, segments.first().unwrap().len());
-        assert_eq!(0, segments.first().unwrap().stats.get_stale_items());
+        assert_eq!(0, segments.first().unwrap().stats.stale_items());
     }
 
     Ok(())

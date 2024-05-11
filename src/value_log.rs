@@ -18,10 +18,10 @@ use std::{
 
 /// A disk-resident value log
 #[derive(Clone)]
-pub struct ValueLog(Arc<ValueLogInner>);
+pub struct ValueLog<I: ExternalIndex + Clone + Send + Sync>(Arc<ValueLogInner<I>>);
 
-impl std::ops::Deref for ValueLog {
-    type Target = ValueLogInner;
+impl<I: ExternalIndex + Clone + Send + Sync> std::ops::Deref for ValueLog<I> {
+    type Target = ValueLogInner<I>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -29,13 +29,13 @@ impl std::ops::Deref for ValueLog {
 }
 
 #[allow(clippy::module_name_repetitions)]
-pub struct ValueLogInner {
+pub struct ValueLogInner<I: ExternalIndex + Clone + Send + Sync> {
     config: Config,
 
     path: PathBuf,
 
     /// External index
-    pub index: Arc<dyn ExternalIndex + Send + Sync>,
+    pub index: I,
 
     /// In-memory blob cache
     blob_cache: Arc<BlobCache>,
@@ -48,7 +48,7 @@ pub struct ValueLogInner {
     rollover_guard: Mutex<()>,
 }
 
-impl ValueLog {
+impl<I: ExternalIndex + Clone + Send + Sync> ValueLog<I> {
     /// Creates or recovers a value log in the given directory.
     ///
     /// # Errors
@@ -57,7 +57,7 @@ impl ValueLog {
     pub fn open<P: Into<PathBuf>>(
         path: P, // TODO: move path into config?
         config: Config,
-        index: Arc<dyn ExternalIndex + Send + Sync>,
+        index: I,
     ) -> crate::Result<Self> {
         let path = path.into();
 
@@ -72,7 +72,7 @@ impl ValueLog {
     pub(crate) fn create_new<P: Into<PathBuf>>(
         path: P,
         config: Config,
-        index: Arc<dyn ExternalIndex + Send + Sync>,
+        index: I,
     ) -> crate::Result<Self> {
         let path = absolute_path(path.into());
         log::trace!("Creating value-log at {}", path.display());
@@ -119,7 +119,7 @@ impl ValueLog {
     pub(crate) fn recover<P: Into<PathBuf>>(
         path: P,
         config: Config,
-        index: Arc<dyn ExternalIndex + Send + Sync>,
+        index: I,
     ) -> crate::Result<Self> {
         let path = path.into();
         log::info!("Recovering value-log at {}", path.display());
@@ -145,6 +145,7 @@ impl ValueLog {
             blob_cache,
             index,
             manifest,
+            // TODO: recover ID, test!!!, maybe store next ID in manifest as u64
             id_generator: IdGenerator::default(),
             rollover_guard: Mutex::new(()),
         })))
@@ -295,17 +296,30 @@ impl ValueLog {
         Ok(())
     }
 
+    fn mark_as_stale(&self, ids: &[SegmentId]) -> crate::Result<()> {
+        let segments = self.manifest.segments.write().expect("lock is poisoned");
+
+        for id in ids {
+            let Some(segment) = segments.get(id) else {
+                continue;
+            };
+
+            segment.stats.mark_as_stale();
+
+            // TODO: need to store stats atomically, to make recovery fast
+            // TODO: changing stats doesn't happen **too** often, so the I/O is fine
+        }
+
+        Ok(())
+    }
+
     /// Rewrites some segments into new segment(s), blocking the caller
     /// until the operation is completely done.
     ///
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    pub fn rollover<W: IndexWriter + Send + Sync>(
-        &self,
-        ids: &[u64],
-        index_writer: &W,
-    ) -> crate::Result<()> {
+    pub fn rollover<W: IndexWriter>(&self, ids: &[u64], index_writer: &W) -> crate::Result<()> {
         // IMPORTANT: Only allow 1 rollover at any given time
         let _guard = self.rollover_guard.lock().expect("lock is poisoned");
 
@@ -346,11 +360,14 @@ impl ValueLog {
         // to avoid dangling pointers
         self.manifest.register(writer)?;
 
+        // NOTE: If we crash before before finishing the index write, it's fine
+        // because all new segments will be unreferenced, and thus can be deleted
         index_writer.finish()?;
 
-        // IMPORTANT: Only once pointers are rewritten is it safe to drop old segments
-        // as we are now sure there are no more references
-        self.manifest.drop_segments(ids)?;
+        // IMPORTANT: We only mark the segments as definitely stale
+        // The external index needs to decide when it is safe to drop
+        // the old segments, as some reads may still be performed
+        self.mark_as_stale(ids)?;
 
         Ok(())
     }
