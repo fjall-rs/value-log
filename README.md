@@ -1,8 +1,13 @@
+[![CI](https://github.com/fjall-rs/value-log/actions/workflows/test.yml/badge.svg)](https://github.com/fjall-rs/value-log/actions/workflows/test.yml)
+[![docs.rs](https://img.shields.io/docsrs/value-log?color=green)](https://docs.rs/value-log)
+[![Crates.io](https://img.shields.io/crates/v/value-log?color=blue)](https://crates.io/crates/value-log)
+![MSRV](https://img.shields.io/badge/MSRV-1.74.0-blue)
+
 # value-log
 
 Generic value log implementation for key-value separated storage, inspired by RocksDB's BlobDB [[1]](#footnotes) and implemented in safe, stable Rust.
 
-> This crate is intended as a building block for key-value separated LSM storage.
+> This crate is intended as a building block for key-value separated storage.
 > You probably want to use https://github.com/fjall-rs/fjall instead.
 
 ## Features
@@ -24,14 +29,6 @@ The disk format will be stable from 1.0.0 (oh, the dreaded 1.0.0...) onwards. An
 All source code is licensed under MIT OR Apache-2.0.
 
 All contributions are to be licensed as MIT OR Apache-2.0.
-
-## Development
-
-### Run benchmarks
-
-```bash
-cargo bench --features bloom
-```
 
 ## Footnotes
 
