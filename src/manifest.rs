@@ -34,7 +34,7 @@ fn rewrite_atomic<P: AsRef<Path>>(path: P, content: &[u8]) -> std::io::Result<()
 #[allow(clippy::module_name_repetitions)]
 pub struct SegmentManifestInner {
     path: PathBuf,
-    pub(crate) segments: RwLock<HashMap<SegmentId, Arc<Segment>>>,
+    pub segments: RwLock<HashMap<SegmentId, Arc<Segment>>>,
 }
 
 #[allow(clippy::module_name_repetitions)]
@@ -141,12 +141,16 @@ impl SegmentManifest {
     }
 
     pub fn drop_segments(&self, ids: &[u64]) -> crate::Result<()> {
+        // TODO: atomic swap
+
         let mut lock = self.segments.write().expect("lock is poisoned");
         lock.retain(|x, _| !ids.contains(x));
         Self::write_to_disk(&self.path, &lock.keys().copied().collect::<Vec<_>>())
     }
 
     pub fn register(&self, writer: MultiWriter) -> crate::Result<()> {
+        // TODO: atomic swap
+
         let mut lock = self.segments.write().expect("lock is poisoned");
         let writers = writer.finish()?;
 
@@ -162,6 +166,7 @@ impl SegmentManifest {
                     stats: Stats {
                         item_count: writer.item_count.into(),
                         total_bytes: writer.written_blob_bytes.into(),
+                        total_uncompressed_bytes: writer.uncompressed_bytes.into(),
                         stale_items: AtomicU64::default(),
                         stale_bytes: AtomicU64::default(),
                     },

@@ -10,12 +10,6 @@ use std::path::PathBuf;
 
 /// A disk segment is an immutable, sorted, contiguous file
 /// that contains key-value pairs.
-///
-/// ### File format
-///
-/// KV: \<key length: u16\> \<key: N\> \<crc hash: u32\> \<value length: u32\> \<value: N\>
-///
-/// Segment: { KV } +
 #[derive(Debug)]
 pub struct Segment {
     /// Segment ID

@@ -9,7 +9,7 @@ fn worst_case_space_amp() -> value_log::Result<()> {
 
     let vl_path = folder.path();
     std::fs::create_dir_all(vl_path)?;
-    let value_log = ValueLog::open(vl_path, Config::default(), index.clone())?;
+    let value_log = ValueLog::open(vl_path, Config::default())?;
 
     assert_eq!(0.0, value_log.manifest.space_amp());
     assert_eq!(0.0, value_log.manifest.stale_ratio());
@@ -52,7 +52,7 @@ fn no_overlap_space_amp() -> value_log::Result<()> {
 
     let vl_path = folder.path();
     std::fs::create_dir_all(vl_path)?;
-    let value_log = ValueLog::open(vl_path, Config::default(), index.clone())?;
+    let value_log = ValueLog::open(vl_path, Config::default())?;
 
     assert_eq!(0.0, value_log.manifest.stale_ratio());
     assert_eq!(0.0, value_log.manifest.space_amp());

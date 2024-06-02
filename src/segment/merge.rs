@@ -1,7 +1,7 @@
 use crate::{id::SegmentId, SegmentReader};
 use std::cmp::Reverse;
 
-// TODO: replace with MinHeap
+// TODO: replace with MinHeap...
 use min_max_heap::MinMaxHeap;
 
 type IteratorIndex = usize;

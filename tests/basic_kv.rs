@@ -9,7 +9,7 @@ fn basic_kv() -> value_log::Result<()> {
 
     let vl_path = folder.path();
     std::fs::create_dir_all(vl_path)?;
-    let value_log = ValueLog::open(vl_path, Config::default(), index.clone())?;
+    let value_log = ValueLog::open(vl_path, Config::default())?;
 
     let items = ["a", "b", "c", "d", "e"];
 

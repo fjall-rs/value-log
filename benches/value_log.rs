@@ -29,7 +29,6 @@ fn load_value(c: &mut Criterion) {
         let value_log = ValueLog::open(
             vl_path,
             Config::default().blob_cache(Arc::new(BlobCache::with_capacity_bytes(0))),
-            index.clone(),
         )
         .unwrap();
 
@@ -76,7 +75,6 @@ fn load_value(c: &mut Criterion) {
             vl_path,
             Config::default()
                 .blob_cache(Arc::new(BlobCache::with_capacity_bytes(64 * 1_024 * 1_024))),
-            index.clone(),
         )
         .unwrap();
 
@@ -128,7 +126,6 @@ fn compression(c: &mut Criterion) {
     let value_log = ValueLog::open(
         vl_path,
         Config::default().blob_cache(Arc::new(BlobCache::with_capacity_bytes(0))),
-        index.clone(),
     )
     .unwrap();
 

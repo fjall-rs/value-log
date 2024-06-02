@@ -6,7 +6,7 @@ use crate::{
     path::absolute_path,
     segment::merge::MergeReader,
     version::Version,
-    Config, ExternalIndex, SegmentWriter, ValueHandle,
+    Config, SegmentWriter, ValueHandle,
 };
 use byteorder::{BigEndian, ReadBytesExt};
 use std::{
@@ -18,10 +18,10 @@ use std::{
 
 /// A disk-resident value log
 #[derive(Clone)]
-pub struct ValueLog<I: ExternalIndex + Clone + Send + Sync>(Arc<ValueLogInner<I>>);
+pub struct ValueLog(Arc<ValueLogInner>);
 
-impl<I: ExternalIndex + Clone + Send + Sync> std::ops::Deref for ValueLog<I> {
-    type Target = ValueLogInner<I>;
+impl std::ops::Deref for ValueLog {
+    type Target = ValueLogInner;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -29,13 +29,14 @@ impl<I: ExternalIndex + Clone + Send + Sync> std::ops::Deref for ValueLog<I> {
 }
 
 #[allow(clippy::module_name_repetitions)]
-pub struct ValueLogInner<I: ExternalIndex + Clone + Send + Sync> {
+pub struct ValueLogInner {
     config: Config,
 
     path: PathBuf,
 
+    // TODO: maybe not needed persistently...
     /// External index
-    pub index: I,
+    //  pub index: I,
 
     /// In-memory blob cache
     blob_cache: Arc<BlobCache>,
@@ -48,7 +49,7 @@ pub struct ValueLogInner<I: ExternalIndex + Clone + Send + Sync> {
     rollover_guard: Mutex<()>,
 }
 
-impl<I: ExternalIndex + Clone + Send + Sync> ValueLog<I> {
+impl ValueLog {
     /// Creates or recovers a value log in the given directory.
     ///
     /// # Errors
@@ -57,23 +58,18 @@ impl<I: ExternalIndex + Clone + Send + Sync> ValueLog<I> {
     pub fn open<P: Into<PathBuf>>(
         path: P, // TODO: move path into config?
         config: Config,
-        index: I,
     ) -> crate::Result<Self> {
         let path = path.into();
 
         if path.join(VLOG_MARKER).try_exists()? {
-            Self::recover(path, config, index)
+            Self::recover(path, config)
         } else {
-            Self::create_new(path, config, index)
+            Self::create_new(path, config)
         }
     }
 
     /// Creates a new empty value log in a directory.
-    pub(crate) fn create_new<P: Into<PathBuf>>(
-        path: P,
-        config: Config,
-        index: I,
-    ) -> crate::Result<Self> {
+    pub(crate) fn create_new<P: Into<PathBuf>>(path: P, config: Config) -> crate::Result<Self> {
         let path = absolute_path(path.into());
         log::trace!("Creating value-log at {}", path.display());
 
@@ -109,18 +105,13 @@ impl<I: ExternalIndex + Clone + Send + Sync> ValueLog<I> {
             config,
             path,
             blob_cache,
-            index,
             manifest,
             id_generator: IdGenerator::default(),
             rollover_guard: Mutex::new(()),
         })))
     }
 
-    pub(crate) fn recover<P: Into<PathBuf>>(
-        path: P,
-        config: Config,
-        index: I,
-    ) -> crate::Result<Self> {
+    pub(crate) fn recover<P: Into<PathBuf>>(path: P, config: Config) -> crate::Result<Self> {
         let path = path.into();
         log::info!("Recovering value-log at {}", path.display());
 
@@ -143,7 +134,6 @@ impl<I: ExternalIndex + Clone + Send + Sync> ValueLog<I> {
             config,
             path,
             blob_cache,
-            index,
             manifest,
             // TODO: recover ID, test!!!, maybe store next ID in manifest as u64
             id_generator: IdGenerator::default(),
@@ -215,7 +205,7 @@ impl<I: ExternalIndex + Clone + Send + Sync> ValueLog<I> {
         )?)
     }
 
-    /// Scans through a segment, refreshing its statistics
+    /*  /// Scans through a segment, refreshing its statistics
     ///
     /// This function is blocking.
     ///
@@ -277,7 +267,7 @@ impl<I: ExternalIndex + Clone + Send + Sync> ValueLog<I> {
         // TODO: changing stats doesn't happen **too** often, so the I/O is fine
 
         Ok(())
-    }
+    } */
 
     /// Drops stale segments
     pub fn drop_stale_segments(&self) -> crate::Result<()> {

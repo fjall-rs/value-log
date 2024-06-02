@@ -17,6 +17,7 @@ pub struct Writer {
     pub(crate) item_count: u64,
 
     pub(crate) written_blob_bytes: u64,
+    pub(crate) uncompressed_bytes: u64,
 }
 
 impl Writer {
@@ -40,6 +41,7 @@ impl Writer {
             offset: 0,
             item_count: 0,
             written_blob_bytes: 0,
+            uncompressed_bytes: 0,
         })
     }
 
@@ -70,6 +72,8 @@ impl Writer {
         assert!(!key.is_empty());
         assert!(key.len() <= u16::MAX.into());
         assert!(u32::try_from(value.len()).is_ok());
+
+        self.uncompressed_bytes += value.len() as u64;
 
         #[cfg(feature = "lz4")]
         let value = lz4_flex::compress_prepend_size(value);

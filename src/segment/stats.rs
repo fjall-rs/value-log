@@ -3,10 +3,11 @@ use std::sync::atomic::AtomicU64;
 #[derive(Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Stats {
-    pub(crate) item_count: AtomicU64,
+    pub(crate) item_count: AtomicU64, // TODO: u64?
     pub(crate) stale_items: AtomicU64,
 
-    pub total_bytes: AtomicU64,
+    pub total_uncompressed_bytes: AtomicU64, // TODO: u64?
+    pub total_bytes: AtomicU64,              // TODO: u64?
     pub(crate) stale_bytes: AtomicU64,
     // TODO: key range
 }
@@ -22,6 +23,11 @@ impl Stats {
 
     pub fn item_count(&self) -> u64 {
         self.item_count.load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    pub fn total_uncompressed_bytes(&self) -> u64 {
+        self.total_uncompressed_bytes
+            .load(std::sync::atomic::Ordering::Acquire)
     }
 
     pub fn total_bytes(&self) -> u64 {

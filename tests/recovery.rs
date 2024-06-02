@@ -13,7 +13,7 @@ fn basic_recovery() -> value_log::Result<()> {
     let items = ["a", "b", "c", "d", "e"];
 
     {
-        let value_log = ValueLog::open(vl_path, Config::default(), index.clone())?;
+        let value_log = ValueLog::open(vl_path, Config::default())?;
 
         {
             let mut writer = value_log.get_writer()?;
@@ -47,7 +47,7 @@ fn basic_recovery() -> value_log::Result<()> {
     }
 
     {
-        let value_log = ValueLog::open(vl_path, Config::default(), index.clone())?;
+        let value_log = ValueLog::open(vl_path, Config::default())?;
 
         // TODO: should be recovered
         for id in value_log.manifest.list_segment_ids() {
@@ -76,8 +76,6 @@ fn basic_recovery() -> value_log::Result<()> {
 fn delete_unfinished_segment_folders() -> value_log::Result<()> {
     let folder = tempfile::tempdir()?;
 
-    let index = MockIndex::default();
-
     let vl_path = folder.path();
     std::fs::create_dir_all(vl_path)?;
 
@@ -86,12 +84,12 @@ fn delete_unfinished_segment_folders() -> value_log::Result<()> {
     assert!(mock_path.try_exists()?);
 
     {
-        let _value_log = ValueLog::open(vl_path, Config::default(), index.clone())?;
+        let _value_log = ValueLog::open(vl_path, Config::default())?;
         assert!(mock_path.try_exists()?);
     }
 
     {
-        let _value_log = ValueLog::open(vl_path, Config::default(), index.clone())?;
+        let _value_log = ValueLog::open(vl_path, Config::default())?;
         assert!(!mock_path.try_exists()?);
     }
 
