@@ -346,7 +346,7 @@ impl ValueLog {
         // IMPORTANT: Only allow 1 rollover or GC at any given time
         let _guard = self.rollover_guard.lock().expect("lock is poisoned");
 
-        log::trace!("--- GC report for vLog @ {:?} ---", self.path);
+        log::info!("--- GC report for vLog @ {:?} ---", self.path);
 
         let mut size_map = BTreeMap::<SegmentId, SegmentCounter>::new();
 
@@ -386,7 +386,7 @@ impl ValueLog {
             let space_amp = total_bytes as f64 / used_size as f64;
             let stale_ratio = stale_bytes as f64 / total_bytes as f64;
 
-            log::trace!(
+            log::info!(
                 "Blob file #{id} has {}/{} stale MiB ({:.1}% stale, {stale_items}/{total_items} items) - space amp: {space_amp})",
                 stale_bytes / 1_024 / 1_024,
                 total_bytes / 1_024 / 1_024,
@@ -417,7 +417,7 @@ impl ValueLog {
                 .expect("segment should exist");
 
             if !size_map.contains_key(id) {
-                log::trace!(
+                log::info!(
                     "Blob file #{id} has no incoming references - can be dropped, freeing {} KiB on disk (userdata={} MiB)",
                     segment.stats.total_bytes / 1_024,
                     segment.stats.total_uncompressed_bytes / 1_024/ 1_024
@@ -426,7 +426,7 @@ impl ValueLog {
             }
         }
 
-        log::trace!("--- GC report done ---");
+        log::info!("--- GC report done ---");
 
         Ok(())
     }
