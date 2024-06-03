@@ -25,9 +25,17 @@ Generic value log implementation for key-value separated storage, inspired by Ro
 
 Keys are limited to 65536 bytes, values are limited to 2^32 bytes.
 
+## Feature flags
+
+### lz4
+
+Allows using `LZ4` compression, powered by [`lz4_flex`](https://github.com/PSeitz/lz4_flex).
+
+*Enabled by default.*
+
 ## Stable disk format
 
-The disk format will be stable from 1.0.0 (oh, the dreaded 1.0.0...) onwards. Any breaking change after that will result in a major bump.
+The disk format is stable as of 1.0.0. Future breaking changes will result in a major version bump and a migration path.
 
 ## License
 
