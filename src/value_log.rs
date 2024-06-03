@@ -6,10 +6,11 @@ use crate::{
     path::absolute_path,
     segment::merge::MergeReader,
     version::Version,
-    Config, SegmentWriter, ValueHandle,
+    Config, ExternalIndex, SegmentWriter, ValueHandle,
 };
 use byteorder::{BigEndian, ReadBytesExt};
 use std::{
+    collections::BTreeMap,
     fs::File,
     io::{BufReader, Read, Seek},
     path::PathBuf,
@@ -269,7 +270,24 @@ impl ValueLog {
         Ok(())
     } */
 
-    /// Drops stale segments
+    /// Finds segment IDs that have reached a stale threshold.
+    #[must_use]
+    pub fn find_segments_with_stale_threshold(&self, threshold: f32) -> Vec<SegmentId> {
+        self.manifest
+            .segments
+            .read()
+            .expect("lock is poisoned")
+            .values()
+            .filter(|x| x.stats.stale_ratio() >= threshold)
+            .map(|x| x.id)
+            .collect::<Vec<_>>()
+    }
+
+    /// Drops stale segments.
+    ///
+    /// # Errors
+    ///
+    /// Will return `Err` if an IO error occurs.
     pub fn drop_stale_segments(&self) -> crate::Result<()> {
         let ids = self
             .manifest
@@ -281,13 +299,20 @@ impl ValueLog {
             .map(|x| x.id)
             .collect::<Vec<_>>();
 
+        log::debug!("Dropping blob files: {ids:?}");
         self.manifest.drop_segments(&ids)?;
 
         Ok(())
     }
 
+    /// Marks some segments as stale.
+    ///
+    /// # Errors
+    ///
+    /// Will return `Err` if an IO error occurs.
     fn mark_as_stale(&self, ids: &[SegmentId]) -> crate::Result<()> {
-        let segments = self.manifest.segments.write().expect("lock is poisoned");
+        // NOTE: Read-locking is fine because we are dealing with an atomic bool
+        let segments = self.manifest.segments.read().expect("lock is poisoned");
 
         for id in ids {
             let Some(segment) = segments.get(id) else {
@@ -303,15 +328,125 @@ impl ValueLog {
         Ok(())
     }
 
+    /// Scans the given index and collecting GC statistics.
+    ///
+    /// # Errors
+    ///
+    /// Will return `Err` if an IO error occurs.
+    #[allow(clippy::result_unit_err)]
+    pub fn scan_for_stats(
+        &self,
+        iter: impl Iterator<Item = Result<(ValueHandle, u32), ()>>,
+    ) -> crate::Result<()> {
+        struct SegmentCounter {
+            size: u64,
+            item_count: u64,
+        }
+
+        // IMPORTANT: Only allow 1 rollover or GC at any given time
+        let _guard = self.rollover_guard.lock().expect("lock is poisoned");
+
+        log::trace!("--- GC report for vLog @ {:?} ---", self.path);
+
+        let mut size_map = BTreeMap::<SegmentId, SegmentCounter>::new();
+
+        for handle in iter {
+            let (handle, size) = handle.map_err(|_| {
+                crate::Error::Io(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "Index returned error",
+                ))
+            })?;
+            let size = u64::from(size);
+
+            size_map
+                .entry(handle.segment_id)
+                .and_modify(|x| {
+                    x.item_count += 1;
+                    x.size += size;
+                })
+                .or_insert_with(|| SegmentCounter {
+                    size,
+                    item_count: 1,
+                });
+        }
+
+        for (&id, counter) in &size_map {
+            let used_size = counter.size;
+            let alive_item_count = counter.item_count;
+
+            let segment = self.manifest.get_segment(id).expect("segment should exist");
+
+            let total_bytes = segment.stats.total_uncompressed_bytes;
+            let stale_bytes = total_bytes - used_size;
+
+            let total_items = segment.stats.item_count;
+            let stale_items = total_items - alive_item_count;
+
+            let space_amp = total_bytes as f64 / used_size as f64;
+            let stale_ratio = stale_bytes as f64 / total_bytes as f64;
+
+            log::trace!(
+                "Blob file #{id} has {}/{} stale MiB ({:.1}% stale, {stale_items}/{total_items} items) - space amp: {space_amp})",
+                stale_bytes / 1_024 / 1_024,
+                total_bytes / 1_024 / 1_024,
+                stale_ratio * 100.0
+            );
+
+            segment
+                .stats
+                .stale_bytes
+                .store(stale_bytes, std::sync::atomic::Ordering::Release);
+
+            segment
+                .stats
+                .stale_items
+                .store(stale_items, std::sync::atomic::Ordering::Release);
+        }
+
+        for id in self
+            .manifest
+            .segments
+            .read()
+            .expect("lock is poisoned")
+            .keys()
+        {
+            let segment = self
+                .manifest
+                .get_segment(*id)
+                .expect("segment should exist");
+
+            if !size_map.contains_key(id) {
+                log::trace!(
+                    "Blob file #{id} has no incoming references - can be dropped, freeing {} KiB on disk (userdata={} MiB)",
+                    segment.stats.total_bytes / 1_024,
+                    segment.stats.total_uncompressed_bytes / 1_024/ 1_024
+                );
+                self.mark_as_stale(&[*id])?;
+            }
+        }
+
+        log::trace!("--- GC report done ---");
+
+        Ok(())
+    }
+
     /// Rewrites some segments into new segment(s), blocking the caller
     /// until the operation is completely done.
     ///
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    pub fn rollover<W: IndexWriter>(&self, ids: &[u64], index_writer: &mut W) -> crate::Result<()> {
-        // IMPORTANT: Only allow 1 rollover at any given time
+    pub fn rollover<R: ExternalIndex, W: IndexWriter>(
+        &self,
+        ids: &[u64],
+        index_reader: &R,
+        index_writer: &mut W,
+    ) -> crate::Result<()> {
+        // IMPORTANT: Only allow 1 rollover or GC at any given time
         let _guard = self.rollover_guard.lock().expect("lock is poisoned");
+
+        log::info!("Rollover segments {ids:?}");
 
         let segments = ids
             .iter()
@@ -332,7 +467,14 @@ impl ValueLog {
         let mut writer = self.get_writer()?;
 
         for item in reader {
-            let (k, v, _) = item?;
+            let (k, v, segment_id) = item?;
+
+            match index_reader.get(&k)? {
+                // If this value is in an older segment, we can discard it
+                Some(x) if segment_id < x.segment_id => continue,
+                None => continue,
+                _ => {}
+            }
 
             let segment_id = writer.segment_id();
             let offset = writer.offset(&k);
@@ -342,7 +484,11 @@ impl ValueLog {
                 String::from_utf8_lossy(&k)
             );
 
-            index_writer.insert_indirection(&k, ValueHandle { segment_id, offset })?;
+            index_writer.insert_indirection(
+                &k,
+                ValueHandle { segment_id, offset },
+                v.len() as u32,
+            )?;
             writer.write(&k, &v)?;
         }
 

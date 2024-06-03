@@ -25,7 +25,12 @@ pub trait Writer {
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    fn insert_indirection(&mut self, key: &[u8], value: ValueHandle) -> std::io::Result<()>;
+    fn insert_indirection(
+        &mut self,
+        key: &[u8],
+        handle: ValueHandle,
+        size: u32,
+    ) -> std::io::Result<()>;
 
     /// Finishes the write batch.
     ///

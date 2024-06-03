@@ -40,8 +40,6 @@ impl Segment {
 
     /// Returns the amount of items in the segment
     pub fn len(&self) -> u64 {
-        self.stats
-            .item_count
-            .load(std::sync::atomic::Ordering::Acquire)
+        self.stats.item_count
     }
 }

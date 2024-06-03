@@ -164,13 +164,19 @@ impl SegmentManifest {
                     id: segment_id,
                     path: segment_folder,
                     stats: Stats {
-                        item_count: writer.item_count.into(),
-                        total_bytes: writer.written_blob_bytes.into(),
-                        total_uncompressed_bytes: writer.uncompressed_bytes.into(),
+                        item_count: writer.item_count,
+                        total_bytes: writer.written_blob_bytes,
+                        total_uncompressed_bytes: writer.uncompressed_bytes,
                         stale_items: AtomicU64::default(),
                         stale_bytes: AtomicU64::default(),
                     },
                 }),
+            );
+
+            log::debug!(
+                "Created segment #{segment_id:?} ({} items, {} userdata bytes)",
+                writer.item_count,
+                writer.uncompressed_bytes,
             );
         }
 
@@ -234,35 +240,17 @@ impl SegmentManifest {
     }
 
     /// Returns the amount of bytes on disk that are occupied by blobs.
-    ///
-    /// This value may not be fresh, as it is only set after running [`ValueLog::refresh_stats`].
     #[must_use]
     pub fn disk_space_used(&self) -> u64 {
         self.segments
             .read()
             .expect("lock is poisoned")
             .values()
-            .map(|x| x.stats.total_bytes())
+            .map(|x| x.stats.total_bytes)
             .sum::<u64>()
     }
 
-    /// Returns the amount of bytes that can be freed on disk
-    /// if all segments were to be defragmented
-    ///
-    /// This value may not be fresh, as it is only set after running [`ValueLog::refresh_stats`].
-    #[must_use]
-    pub fn reclaimable_bytes(&self) -> u64 {
-        self.segments
-            .read()
-            .expect("lock is poisoned")
-            .values()
-            .map(|x| x.stats.stale_bytes())
-            .sum::<u64>()
-    }
-
-    /// Returns the amount of stale items
-    ///
-    /// This value may not be fresh, as it is only set after running [`ValueLog::refresh_stats`].
+    /*  /// Returns the amount of stale items
     #[must_use]
     pub fn stale_items_count(&self) -> u64 {
         self.segments
@@ -271,11 +259,9 @@ impl SegmentManifest {
             .values()
             .map(|x| x.stats.stale_items())
             .sum::<u64>()
-    }
+    } */
 
-    /// Returns the percent of dead bytes in the value log
-    ///
-    /// This value may not be fresh, as it is only set after running [`ValueLog::refresh_stats`].
+    /// Returns the percent of dead bytes (uncompressed) in the value log
     #[must_use]
     pub fn stale_ratio(&self) -> f32 {
         let used_bytes = self
@@ -283,7 +269,7 @@ impl SegmentManifest {
             .read()
             .expect("lock is poisoned")
             .values()
-            .map(|x| x.stats.total_bytes())
+            .map(|x| x.stats.total_uncompressed_bytes)
             .sum::<u64>();
         if used_bytes == 0 {
             return 0.0;
@@ -296,6 +282,7 @@ impl SegmentManifest {
             .values()
             .map(|x| x.stats.stale_bytes())
             .sum::<u64>();
+
         if stale_bytes == 0 {
             return 0.0;
         }
@@ -306,8 +293,6 @@ impl SegmentManifest {
     /// Returns the approximate space amplification
     ///
     /// Returns 0.0 if there are no items.
-    ///
-    /// This value may not be fresh, as it is only set after running [`ValueLog::refresh_stats`].
     #[must_use]
     pub fn space_amp(&self) -> f32 {
         let used_bytes = self
@@ -315,8 +300,9 @@ impl SegmentManifest {
             .read()
             .expect("lock is poisoned")
             .values()
-            .map(|x| x.stats.total_bytes())
+            .map(|x| x.stats.total_uncompressed_bytes)
             .sum::<u64>();
+
         if used_bytes == 0 {
             return 0.0;
         }
