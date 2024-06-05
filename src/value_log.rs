@@ -131,13 +131,21 @@ impl ValueLog {
         let blob_cache = config.blob_cache.clone();
         let manifest = SegmentManifest::recover(&path)?;
 
+        let highest_id = manifest
+            .segments
+            .read()
+            .expect("lock is poisoned")
+            .values()
+            .map(|x| x.id)
+            .max()
+            .unwrap_or_default();
+
         Ok(Self(Arc::new(ValueLogInner {
             config,
             path,
             blob_cache,
             manifest,
-            // TODO: recover ID, test!!!, maybe store next ID in manifest as u64
-            id_generator: IdGenerator::default(),
+            id_generator: IdGenerator::new(highest_id + 1),
             rollover_guard: Mutex::new(()),
         })))
     }
