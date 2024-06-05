@@ -37,5 +37,5 @@ pub trait Writer {
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    fn finish(&mut self) -> std::io::Result<()>;
+    fn finish(self) -> std::io::Result<()>;
 }

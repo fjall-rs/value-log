@@ -114,7 +114,7 @@ impl ValueLog {
 
     pub(crate) fn recover<P: Into<PathBuf>>(path: P, config: Config) -> crate::Result<Self> {
         let path = path.into();
-        log::info!("Recovering value-log at {}", path.display());
+        log::info!("Recovering vLog at {}", path.display());
 
         {
             let bytes = std::fs::read(path.join(VLOG_MARKER))?;
@@ -171,7 +171,7 @@ impl ValueLog {
             return Ok(Some(value));
         }
 
-        let mut reader = BufReader::new(File::open(segment.path.join("data"))?);
+        let mut reader = BufReader::new(File::open(&segment.path)?);
         reader.seek(std::io::SeekFrom::Start(handle.offset))?;
 
         let _crc = reader.read_u32::<BigEndian>()?;
@@ -202,7 +202,7 @@ impl ValueLog {
         Ok(SegmentWriter::new(
             self.id_generator.clone(),
             self.config.segment_size_bytes,
-            &self.path,
+            self.path.join(SEGMENTS_FOLDER),
         )?)
     }
 
@@ -336,7 +336,7 @@ impl ValueLog {
     #[allow(clippy::result_unit_err)]
     pub fn scan_for_stats(
         &self,
-        iter: impl Iterator<Item = Result<(ValueHandle, u32), ()>>,
+        iter: impl Iterator<Item = std::io::Result<(ValueHandle, u32)>>,
     ) -> crate::Result<()> {
         struct SegmentCounter {
             size: u64,
@@ -441,7 +441,7 @@ impl ValueLog {
         &self,
         ids: &[u64],
         index_reader: &R,
-        index_writer: &mut W,
+        mut index_writer: W,
     ) -> crate::Result<()> {
         // IMPORTANT: Only allow 1 rollover or GC at any given time
         let _guard = self.rollover_guard.lock().expect("lock is poisoned");

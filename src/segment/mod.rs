@@ -15,7 +15,7 @@ pub struct Segment {
     /// Segment ID
     pub id: SegmentId,
 
-    /// Segment path (folder)
+    /// Segment file path
     pub path: PathBuf,
 
     /// Segment statistics
@@ -29,8 +29,7 @@ impl Segment {
     ///
     /// Will return `Err` if an IO error occurs.
     pub fn scan(&self) -> std::io::Result<reader::Reader> {
-        let path = self.path.join("data");
-        reader::Reader::new(path, self.id)
+        reader::Reader::new(&self.path, self.id)
     }
 
     /// Always returns `false`

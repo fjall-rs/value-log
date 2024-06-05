@@ -1,4 +1,8 @@
-use crate::{id::SegmentId, segment::stats::Stats, Segment, SegmentWriter as MultiWriter};
+use crate::{
+    id::SegmentId,
+    segment::stats::{SegmentFileTrailer, Stats},
+    Segment, SegmentWriter as MultiWriter,
+};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::{
     collections::HashMap,
@@ -66,7 +70,7 @@ impl SegmentManifest {
                     .expect("should be valid segment ID");
 
                 if !registered_ids.contains(&segment_id) {
-                    log::trace!("Deleting unfinished v-log segment {segment_id}");
+                    log::trace!("Deleting unfinished vLog segment {segment_id}");
                     std::fs::remove_dir_all(dirent.path())?;
                 }
             }
@@ -102,6 +106,8 @@ impl SegmentManifest {
 
         let ids = Self::load_ids_from_disk(&path)?;
 
+        log::debug!("Recovering vLog segments: {ids:?}");
+
         let segments_folder = folder.join(SEGMENTS_FOLDER);
         Self::remove_unfinished_segments(&segments_folder, &ids)?;
 
@@ -109,12 +115,21 @@ impl SegmentManifest {
             let mut map = HashMap::with_capacity(100);
 
             for id in ids {
+                log::trace!("Recovering segment #{id:?}");
+
+                let path = segments_folder.join(id.to_string());
+                let trailer = SegmentFileTrailer::from_file(&path)?;
+
                 map.insert(
                     id,
                     Arc::new(Segment {
                         id,
-                        path: segments_folder.join(id.to_string()),
-                        stats: Stats::default(),
+                        path,
+                        stats: Stats {
+                            persisted: trailer,
+                            stale_bytes: AtomicU64::default(),
+                            stale_items: AtomicU64::default(),
+                        },
                     }),
                 );
             }
@@ -155,18 +170,33 @@ impl SegmentManifest {
         let writers = writer.finish()?;
 
         for writer in writers {
+            if writer.item_count == 0 {
+                log::trace!(
+                    "Writer at {:?} has written no data, deleting empty vLog segment file",
+                    writer.path
+                );
+                if let Err(e) = std::fs::remove_file(&writer.path) {
+                    log::warn!(
+                        "Could not delete empty vLog segment file at {:?}: {e:?}",
+                        writer.path
+                    );
+                };
+                continue;
+            }
+
             let segment_id = writer.segment_id;
-            let segment_folder = writer.folder.clone();
 
             lock.insert(
                 segment_id,
                 Arc::new(Segment {
                     id: segment_id,
-                    path: segment_folder,
+                    path: writer.path,
                     stats: Stats {
-                        item_count: writer.item_count,
-                        total_bytes: writer.written_blob_bytes,
-                        total_uncompressed_bytes: writer.uncompressed_bytes,
+                        persisted: SegmentFileTrailer {
+                            item_count: writer.item_count,
+                            total_bytes: writer.written_blob_bytes,
+                            total_uncompressed_bytes: writer.uncompressed_bytes,
+                        },
                         stale_items: AtomicU64::default(),
                         stale_bytes: AtomicU64::default(),
                     },

@@ -95,6 +95,7 @@ mod manifest;
 mod mock;
 mod path;
 mod segment;
+mod serde;
 mod value_log;
 mod version;
 
@@ -108,6 +109,7 @@ pub use {
     segment::reader::Reader as SegmentReader,
     segment::Segment,
     value_log::ValueLog,
+    version::Version,
 };
 
 #[doc(hidden)]

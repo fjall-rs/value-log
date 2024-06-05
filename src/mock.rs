@@ -56,7 +56,7 @@ impl IndexWriter for MockIndexWriter {
         self.0.insert_indirection(key, value)
     }
 
-    fn finish(&mut self) -> std::io::Result<()> {
+    fn finish(self) -> std::io::Result<()> {
         Ok(())
     }
 }

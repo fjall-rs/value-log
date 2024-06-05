@@ -1,4 +1,4 @@
-use crate::id::SegmentId;
+use crate::{id::SegmentId, serde::Serializable};
 use byteorder::{BigEndian, WriteBytesExt};
 use std::{
     fs::File,
@@ -6,16 +6,18 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use super::stats::SegmentFileTrailer;
+
 /// Segment writer
 pub struct Writer {
-    pub(crate) folder: PathBuf,
+    pub(crate) path: PathBuf,
     pub(crate) segment_id: SegmentId,
 
     inner: BufWriter<File>,
 
     offset: u64,
-    pub(crate) item_count: u64,
 
+    pub(crate) item_count: u64,
     pub(crate) written_blob_bytes: u64,
     pub(crate) uncompressed_bytes: u64,
 }
@@ -27,15 +29,13 @@ impl Writer {
     ///
     /// Will return `Err` if an IO error occurs.
     #[doc(hidden)]
-    pub fn new<P: AsRef<Path>>(segment_id: SegmentId, path: P) -> std::io::Result<Self> {
+    pub fn new<P: AsRef<Path>>(path: P, segment_id: SegmentId) -> std::io::Result<Self> {
         let path = path.as_ref();
-        let folder = path.parent().expect("should have parent directory");
 
-        std::fs::create_dir_all(folder)?;
         let file = File::create(path)?;
 
         Ok(Self {
-            folder: folder.into(),
+            path: path.into(),
             segment_id,
             inner: BufWriter::new(file),
             offset: 0,
@@ -113,9 +113,17 @@ impl Writer {
         Ok(value.len() as u32)
     }
 
-    pub(crate) fn flush(&mut self) -> std::io::Result<()> {
+    pub(crate) fn flush(&mut self) -> crate::Result<()> {
+        SegmentFileTrailer {
+            item_count: self.item_count,
+            total_bytes: self.written_blob_bytes,
+            total_uncompressed_bytes: self.uncompressed_bytes,
+        }
+        .serialize(&mut self.inner)?;
+
         self.inner.flush()?;
         self.inner.get_mut().sync_all()?;
+
         Ok(())
     }
 }
