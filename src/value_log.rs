@@ -35,10 +35,6 @@ pub struct ValueLogInner {
 
     path: PathBuf,
 
-    // TODO: maybe not needed persistently...
-    /// External index
-    //  pub index: I,
-
     /// In-memory blob cache
     blob_cache: Arc<BlobCache>,
 

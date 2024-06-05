@@ -16,6 +16,10 @@ impl std::ops::Deref for IdGenerator {
 }
 
 impl IdGenerator {
+    pub fn new(start: u64) -> Self {
+        Self(Arc::new(AtomicU64::new(start)))
+    }
+
     pub fn next(&self) -> SegmentId {
         self.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
     }
