@@ -29,7 +29,7 @@ impl Segment {
     ///
     /// Will return `Err` if an IO error occurs.
     pub fn scan(&self) -> std::io::Result<reader::Reader> {
-        reader::Reader::new(&self.path, self.id)
+        reader::Reader::new(&self.path, self.id, self.stats.item_count)
     }
 
     /// Always returns `false`

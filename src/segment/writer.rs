@@ -86,6 +86,7 @@ impl Writer {
         #[allow(clippy::cast_possible_truncation)]
         self.inner.write_u16::<BigEndian>(key.len() as u16)?;
         self.inner.write_all(key)?;
+
         self.inner.write_u32::<BigEndian>(crc)?;
 
         // NOTE: Truncation is okay and actually needed

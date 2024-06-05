@@ -34,8 +34,15 @@ fn basic_kv() -> value_log::Result<()> {
 
         let segments = value_log.manifest.list_segments();
 
-        assert_eq!(items.len() as u64, segments.first().unwrap().len());
-        assert_eq!(0, segments.first().unwrap().stats.stale_items());
+        let segment = segments.first().unwrap();
+
+        assert_eq!(items.len() as u64, segment.len());
+        assert_eq!(0, segment.stats.stale_items());
+
+        assert_eq!(
+            segment.len(),
+            segment.scan().into_iter().flatten().count() as u64
+        );
     }
 
     for (key, handle) in index.read().unwrap().iter() {
