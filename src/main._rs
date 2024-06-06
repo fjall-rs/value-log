@@ -244,7 +244,7 @@ fn main() -> value_log::Result<()> {
     for segment_id in value_log.list_segments() {
         // Scan segment
         let reader = SegmentReader::new(
-            vl_path.join("segments").join(&*segment_id).join("data"),
+            vl_path.join("segments").join(&*segment_id),
             segment_id.clone(),
         )?;
 
