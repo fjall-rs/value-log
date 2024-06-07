@@ -11,6 +11,7 @@ pub const TRAILER_MAGIC: &[u8] = &[b'F', b'J', b'L', b'L', b'T', b'R', b'L', b'1
 pub const TRAILER_SIZE: usize = 256;
 
 #[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct SegmentFileTrailer {
     pub item_count: u64,
     pub total_bytes: u64,

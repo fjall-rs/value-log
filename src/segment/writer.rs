@@ -1,3 +1,4 @@
+use super::stats::SegmentFileTrailer;
 use crate::{id::SegmentId, serde::Serializable};
 use byteorder::{BigEndian, WriteBytesExt};
 use std::{
@@ -5,8 +6,6 @@ use std::{
     io::{BufWriter, Write},
     path::{Path, PathBuf},
 };
-
-use super::stats::SegmentFileTrailer;
 
 /// Segment writer
 pub struct Writer {
