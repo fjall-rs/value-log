@@ -19,11 +19,18 @@ fn basic_kv() -> value_log::Result<()> {
         let segment_id = writer.segment_id();
 
         for key in &items {
+            let value = key.repeat(1_000);
+            let value = value.as_bytes();
+
             let offset = writer.offset(key.as_bytes());
 
-            index.insert_indirection(key.as_bytes(), ValueHandle { offset, segment_id })?;
+            index.insert_indirection(
+                key.as_bytes(),
+                ValueHandle { offset, segment_id },
+                value.len() as u32,
+            )?;
 
-            writer.write(key.as_bytes(), key.repeat(1_000).as_bytes())?;
+            writer.write(key.as_bytes(), value)?;
         }
 
         value_log.register(writer)?;
@@ -45,7 +52,7 @@ fn basic_kv() -> value_log::Result<()> {
         );
     }
 
-    for (key, handle) in index.read().unwrap().iter() {
+    for (key, (handle, _)) in index.read().unwrap().iter() {
         let item = value_log.get(handle)?.unwrap();
         assert_eq!(item, key.repeat(1_000).into());
     }

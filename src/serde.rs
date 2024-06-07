@@ -1,4 +1,4 @@
-use std::io::Write;
+use std::io::{Read, Write};
 
 /// Error during serialization
 #[derive(Debug)]
@@ -39,7 +39,7 @@ pub trait Serializable {
     /// Serialize to bytes
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializeError>;
 }
-/*
+
 /// Trait to deserialize stuff
 pub trait Deserializable {
     /// Deserialize from bytes
@@ -47,4 +47,3 @@ pub trait Deserializable {
     where
         Self: Sized;
 }
- */

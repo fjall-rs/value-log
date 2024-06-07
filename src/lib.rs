@@ -45,13 +45,16 @@
 //! # let path = folder.path();
 //! #
 //! // Open or recover value log from disk
-//! let value_log = ValueLog::open(path, Config::default(), index.clone())?;
+//! let value_log = ValueLog::open(path, Config::default())?;
 //!
 //! // Write some data
 //! let mut writer = value_log.get_writer()?;
 //! let segment_id = writer.segment_id();
 //!
 //! for key in ["a", "b", "c", "d", "e"] {
+//!     let value = key.repeat(1_000);
+//!     let value = value.as_bytes();
+//!
 //!     let offset = writer.offset(key.as_bytes());
 //!
 //!     // NOTE: The data written to the value log is only stable
@@ -59,9 +62,9 @@
 //!     //
 //!     // When implementing the ExternalIndex trait, it's important to
 //!     // not hand out ValueHandles before that point in time
-//!     index.insert_indirection(key.as_bytes(), ValueHandle { offset, segment_id })?;
+//!     index.insert_indirection(key.as_bytes(), ValueHandle { offset, segment_id }, value.len() as u32)?;
 //!
-//!     writer.write(key.as_bytes(), key.repeat(1_000).as_bytes())?;
+//!     writer.write(key.as_bytes(), value)?;
 //! }
 //!
 //! // Finish writing
@@ -69,7 +72,6 @@
 //!
 //! // Get some stats
 //! assert_eq!(1.0, value_log.manifest.space_amp());
-//! assert_eq!(0, value_log.manifest.reclaimable_bytes());
 //! #
 //! # Ok(())
 //! # }
@@ -96,6 +98,7 @@ mod mock;
 mod path;
 mod segment;
 mod serde;
+mod value;
 mod value_log;
 mod version;
 
@@ -108,6 +111,7 @@ pub use {
     segment::multi_writer::MultiWriter as SegmentWriter,
     segment::reader::Reader as SegmentReader,
     segment::Segment,
+    value::UserValue,
     value_log::ValueLog,
     version::Version,
 };

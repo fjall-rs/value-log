@@ -1,9 +1,8 @@
-use crate::ValueHandle;
+use crate::{value::UserValue, ValueHandle};
 use quick_cache::{sync::Cache, Weighter};
-use std::sync::Arc;
 
 type CacheKey = ValueHandle;
-type Item = Arc<[u8]>;
+type Item = UserValue;
 
 #[derive(Clone)]
 struct BlobWeighter;
@@ -43,7 +42,7 @@ impl BlobCache {
         }
     }
 
-    pub(crate) fn insert(&self, handle: CacheKey, value: Arc<[u8]>) {
+    pub(crate) fn insert(&self, handle: CacheKey, value: UserValue) {
         if self.capacity > 0 {
             self.data.insert(handle, value);
         }

@@ -25,14 +25,16 @@ fn worst_case_space_amp() -> value_log::Result<()> {
 
         let offset = writer.offset(key.as_bytes());
 
-        index.insert_indirection(key.as_bytes(), ValueHandle { offset, segment_id })?;
+        index.insert_indirection(
+            key.as_bytes(),
+            ValueHandle { offset, segment_id },
+            value.len() as u32,
+        )?;
 
         writer.write(key.as_bytes(), value.as_bytes())?;
         value_log.register(writer)?;
 
-        for id in value_log.manifest.list_segment_ids() {
-            value_log.refresh_stats(id)?;
-        }
+        value_log.scan_for_stats(index.read().unwrap().values().cloned().map(Ok))?;
 
         assert_eq!(x as f32, value_log.manifest.space_amp());
 
@@ -67,14 +69,16 @@ fn no_overlap_space_amp() -> value_log::Result<()> {
 
         let offset = writer.offset(key.as_bytes());
 
-        index.insert_indirection(key.as_bytes(), ValueHandle { offset, segment_id })?;
+        index.insert_indirection(
+            key.as_bytes(),
+            ValueHandle { offset, segment_id },
+            value.len() as u32,
+        )?;
 
         writer.write(key.as_bytes(), value.as_bytes())?;
         value_log.register(writer)?;
 
-        for id in value_log.manifest.list_segment_ids() {
-            value_log.refresh_stats(id)?;
-        }
+        value_log.scan_for_stats(index.read().unwrap().values().cloned().map(Ok))?;
 
         assert_eq!(1.0, value_log.manifest.space_amp());
         assert_eq!(0.0, value_log.manifest.stale_ratio());

@@ -4,7 +4,7 @@ use std::{
 };
 use value_log::{Config, ExternalIndex, IndexWriter, ValueHandle, ValueLog};
 
-type DebugIndexInner = RwLock<BTreeMap<Arc<[u8]>, ValueHandle>>;
+type DebugIndexInner = RwLock<BTreeMap<Arc<[u8]>, (ValueHandle, u32)>>;
 
 #[derive(Clone, Default)]
 pub struct DebugIndex(Arc<DebugIndexInner>);
@@ -18,10 +18,10 @@ impl std::ops::Deref for DebugIndex {
 }
 
 impl DebugIndex {
-    fn insert_indirection(&self, key: &[u8], value: ValueHandle) -> std::io::Result<()> {
+    fn insert_indirection(&self, key: &[u8], value: ValueHandle, size: u32) -> std::io::Result<()> {
         self.write()
             .expect("lock is poisoned")
-            .insert(key.into(), value);
+            .insert(key.into(), (value, size));
 
         Ok(())
     }
@@ -29,7 +29,12 @@ impl DebugIndex {
 
 impl ExternalIndex for DebugIndex {
     fn get(&self, key: &[u8]) -> std::io::Result<Option<ValueHandle>> {
-        Ok(self.read().expect("lock is poisoned").get(key).cloned())
+        Ok(self
+            .read()
+            .expect("lock is poisoned")
+            .get(key)
+            .map(|(handle, _)| handle)
+            .cloned())
     }
 }
 
@@ -37,18 +42,17 @@ impl ExternalIndex for DebugIndex {
 #[allow(clippy::module_name_repetitions)]
 pub struct DebugIndexWriter(DebugIndex);
 
-impl From<DebugIndex> for DebugIndexWriter {
-    fn from(value: DebugIndex) -> Self {
-        Self(value)
-    }
-}
-
 impl IndexWriter for DebugIndexWriter {
-    fn insert_indirection(&mut self, key: &[u8], value: ValueHandle) -> std::io::Result<()> {
-        self.0.insert_indirection(key, value)
+    fn insert_indirection(
+        &mut self,
+        key: &[u8],
+        value: ValueHandle,
+        size: u32,
+    ) -> std::io::Result<()> {
+        self.0.insert_indirection(key, value, size)
     }
 
-    fn finish(&mut self) -> std::io::Result<()> {
+    fn finish(self) -> std::io::Result<()> {
         Err(std::io::Error::new(std::io::ErrorKind::Other, "Oh no"))
     }
 }
@@ -57,7 +61,7 @@ impl IndexWriter for DebugIndexWriter {
 fn rollover_index_fail_finish() -> value_log::Result<()> {
     let folder = tempfile::tempdir()?;
 
-    let index = DebugIndex(RwLock::new(BTreeMap::<Arc<[u8]>, ValueHandle>::default()).into());
+    let index = DebugIndex(Arc::new(RwLock::new(BTreeMap::default())));
 
     let vl_path = folder.path();
     std::fs::create_dir_all(vl_path)?;
@@ -71,11 +75,18 @@ fn rollover_index_fail_finish() -> value_log::Result<()> {
         let segment_id = writer.segment_id();
 
         for key in &items {
+            let value = key.repeat(1_000);
+            let value = value.as_bytes();
+
             let offset = writer.offset(key.as_bytes());
 
-            index.insert_indirection(key.as_bytes(), ValueHandle { offset, segment_id })?;
+            index.insert_indirection(
+                key.as_bytes(),
+                ValueHandle { offset, segment_id },
+                value.len() as u32,
+            )?;
 
-            writer.write(key.as_bytes(), key.repeat(500).as_bytes())?;
+            writer.write(key.as_bytes(), value)?;
         }
 
         value_log.register(writer)?;
@@ -83,7 +94,8 @@ fn rollover_index_fail_finish() -> value_log::Result<()> {
 
     assert_eq!(value_log.manifest.list_segment_ids(), [0]);
 
-    value_log.refresh_stats(0)?;
+    value_log.scan_for_stats(index.read().unwrap().values().cloned().map(Ok))?;
+
     assert_eq!(
         value_log
             .manifest
@@ -94,8 +106,7 @@ fn rollover_index_fail_finish() -> value_log::Result<()> {
         0.0
     );
 
-    let mut writer = DebugIndexWriter(index.clone());
-    let result = value_log.rollover(&[0], &mut writer);
+    let result = value_log.rollover(&[0], &index, DebugIndexWriter(index.clone()));
     assert!(result.is_err());
 
     assert_eq!(
@@ -107,7 +118,8 @@ fn rollover_index_fail_finish() -> value_log::Result<()> {
         [0, 1]
     );
 
-    value_log.refresh_stats(0)?;
+    value_log.scan_for_stats(index.read().unwrap().values().cloned().map(Ok))?;
+
     assert_eq!(
         value_log
             .manifest

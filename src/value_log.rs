@@ -5,6 +5,7 @@ use crate::{
     manifest::{SegmentManifest, SEGMENTS_FOLDER, VLOG_MARKER},
     path::absolute_path,
     segment::merge::MergeReader,
+    value::UserValue,
     version::Version,
     Config, ExternalIndex, SegmentWriter, ValueHandle,
 };
@@ -81,7 +82,7 @@ impl ValueLog {
         // -> the V-log is fully initialized
 
         let mut file = std::fs::File::create(marker_path)?;
-        Version::V0.write_file_header(&mut file)?;
+        Version::V1.write_file_header(&mut file)?;
         file.sync_all()?;
 
         #[cfg(not(target_os = "windows"))]
@@ -116,7 +117,7 @@ impl ValueLog {
             let bytes = std::fs::read(path.join(VLOG_MARKER))?;
 
             if let Some(version) = Version::parse_file_header(&bytes) {
-                if version != Version::V0 {
+                if version != Version::V1 {
                     return Err(crate::Error::InvalidVersion(Some(version)));
                 }
             } else {
@@ -166,7 +167,7 @@ impl ValueLog {
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    pub fn get(&self, handle: &ValueHandle) -> crate::Result<Option<Arc<[u8]>>> {
+    pub fn get(&self, handle: &ValueHandle) -> crate::Result<Option<UserValue>> {
         let Some(segment) = self.manifest.get_segment(handle.segment_id) else {
             return Ok(None);
         };
@@ -190,7 +191,7 @@ impl ValueLog {
 
         // TODO: handle CRC
 
-        let val: Arc<[u8]> = val.into();
+        let val: UserValue = val.into();
 
         self.blob_cache.insert(handle.clone(), val.clone());
 
@@ -209,70 +210,6 @@ impl ValueLog {
             self.path.join(SEGMENTS_FOLDER),
         )?)
     }
-
-    /*  /// Scans through a segment, refreshing its statistics
-    ///
-    /// This function is blocking.
-    ///
-    /// # Errors
-    ///
-    /// Will return `Err` if an IO error occurs.
-    pub fn refresh_stats(&self, segment_id: SegmentId) -> std::io::Result<()> {
-        let Some(segment) = self.manifest.get_segment(segment_id) else {
-            return Ok(());
-        };
-
-        // Scan segment
-        let scanner = segment.scan()?;
-
-        let mut item_count = 0;
-        let mut total_bytes = 0;
-
-        let mut stale_items = 0;
-        let mut stale_bytes = 0;
-
-        for item in scanner {
-            let (key, val) = item?;
-            item_count += 1;
-            total_bytes += val.len() as u64;
-
-            if let Some(item) = self.index.get(&key)? {
-                // NOTE: Segment IDs are monotonically increasing
-                if item.segment_id > segment_id {
-                    stale_items += 1;
-                    stale_bytes += val.len() as u64;
-                }
-            } else {
-                stale_items += 1;
-                stale_bytes += val.len() as u64;
-            }
-        }
-
-        segment
-            .stats
-            .item_count
-            .store(item_count, std::sync::atomic::Ordering::Release);
-
-        segment
-            .stats
-            .total_bytes
-            .store(total_bytes, std::sync::atomic::Ordering::Release);
-
-        segment
-            .stats
-            .stale_items
-            .store(stale_items, std::sync::atomic::Ordering::Release);
-
-        segment
-            .stats
-            .stale_bytes
-            .store(stale_bytes, std::sync::atomic::Ordering::Release);
-
-        // TODO: need to store stats atomically, to make recovery fast
-        // TODO: changing stats doesn't happen **too** often, so the I/O is fine
-
-        Ok(())
-    } */
 
     /// Finds segment IDs that have reached a stale threshold.
     #[must_use]
@@ -314,7 +251,7 @@ impl ValueLog {
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    fn mark_as_stale(&self, ids: &[SegmentId]) -> crate::Result<()> {
+    fn mark_as_stale(&self, ids: &[SegmentId]) {
         // NOTE: Read-locking is fine because we are dealing with an atomic bool
         let segments = self.manifest.segments.read().expect("lock is poisoned");
 
@@ -324,12 +261,7 @@ impl ValueLog {
             };
 
             segment.stats.mark_as_stale();
-
-            // TODO: need to store stats atomically, to make recovery fast
-            // TODO: changing stats doesn't happen **too** often, so the I/O is fine
         }
-
-        Ok(())
     }
 
     /// Scans the given index and collecting GC statistics.
@@ -426,7 +358,7 @@ impl ValueLog {
                     segment.stats.total_bytes / 1_024,
                     segment.stats.total_uncompressed_bytes / 1_024/ 1_024
                 );
-                self.mark_as_stale(&[*id])?;
+                self.mark_as_stale(&[*id]);
             }
         }
 
@@ -507,7 +439,7 @@ impl ValueLog {
         // IMPORTANT: We only mark the segments as definitely stale
         // The external index needs to decide when it is safe to drop
         // the old segments, as some reads may still be performed
-        self.mark_as_stale(ids)?;
+        self.mark_as_stale(ids);
 
         Ok(())
     }

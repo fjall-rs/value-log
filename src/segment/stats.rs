@@ -15,7 +15,6 @@ pub struct SegmentFileTrailer {
     pub item_count: u64,
     pub total_bytes: u64,
     pub total_uncompressed_bytes: u64,
-    // TODO: key range
 }
 
 impl SegmentFileTrailer {
@@ -56,7 +55,6 @@ impl Serializable for SegmentFileTrailer {
         v.write_u64::<BigEndian>(self.item_count)?;
         v.write_u64::<BigEndian>(self.total_bytes)?;
         v.write_u64::<BigEndian>(self.total_uncompressed_bytes)?;
-        // self.key_range.serialize(writer)?; // TODO:
 
         // Pad with remaining bytes
         v.resize(TRAILER_SIZE - TRAILER_MAGIC.len(), 0);

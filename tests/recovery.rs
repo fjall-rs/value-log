@@ -21,11 +21,18 @@ fn basic_recovery() -> value_log::Result<()> {
             let segment_id = writer.segment_id();
 
             for key in &items {
+                let value = key.repeat(1_000);
+                let value = value.as_bytes();
+
                 let offset = writer.offset(key.as_bytes());
 
-                index.insert_indirection(key.as_bytes(), ValueHandle { offset, segment_id })?;
+                index.insert_indirection(
+                    key.as_bytes(),
+                    ValueHandle { offset, segment_id },
+                    value.len() as u32,
+                )?;
 
-                writer.write(key.as_bytes(), key.repeat(1_000).as_bytes())?;
+                writer.write(key.as_bytes(), value)?;
             }
 
             value_log.register(writer)?;
@@ -40,7 +47,7 @@ fn basic_recovery() -> value_log::Result<()> {
             assert_eq!(0, segments.first().unwrap().stats.stale_items());
         }
 
-        for (key, handle) in index.read().unwrap().iter() {
+        for (key, (handle, _)) in index.read().unwrap().iter() {
             let item = value_log.get(handle)?.unwrap();
             assert_eq!(item, key.repeat(1_000).into());
         }
@@ -49,10 +56,7 @@ fn basic_recovery() -> value_log::Result<()> {
     {
         let value_log = ValueLog::open(vl_path, Config::default())?;
 
-        // TODO: should be recovered
-        for id in value_log.manifest.list_segment_ids() {
-            value_log.refresh_stats(id)?;
-        }
+        value_log.scan_for_stats(index.read().unwrap().values().cloned().map(Ok))?;
 
         {
             assert_eq!(1, value_log.segment_count());
@@ -63,7 +67,7 @@ fn basic_recovery() -> value_log::Result<()> {
             assert_eq!(0, segments.first().unwrap().stats.stale_items());
         }
 
-        for (key, handle) in index.read().unwrap().iter() {
+        for (key, (handle, _)) in index.read().unwrap().iter() {
             let item = value_log.get(handle)?.unwrap();
             assert_eq!(item, key.repeat(1_000).into());
         }

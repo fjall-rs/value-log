@@ -41,12 +41,16 @@ fn load_value(c: &mut Criterion) {
             let key = size.to_string();
             let offset = writer.offset(key.as_bytes());
 
-            index
-                .insert_indirection(key.as_bytes(), ValueHandle { offset, segment_id })
-                .unwrap();
-
             let mut data = vec![0u8; size];
             rng.fill_bytes(&mut data);
+
+            index
+                .insert_indirection(
+                    key.as_bytes(),
+                    ValueHandle { offset, segment_id },
+                    data.len() as u32,
+                )
+                .unwrap();
 
             writer.write(key.as_bytes(), &data).unwrap();
         }
@@ -87,12 +91,16 @@ fn load_value(c: &mut Criterion) {
             let key = size.to_string();
             let offset = writer.offset(key.as_bytes());
 
-            index
-                .insert_indirection(key.as_bytes(), ValueHandle { offset, segment_id })
-                .unwrap();
-
             let mut data = vec![0u8; size];
             rng.fill_bytes(&mut data);
+
+            index
+                .insert_indirection(
+                    key.as_bytes(),
+                    ValueHandle { offset, segment_id },
+                    data.len() as u32,
+                )
+                .unwrap();
 
             writer.write(key.as_bytes(), &data).unwrap();
         }
@@ -140,12 +148,16 @@ fn compression(c: &mut Criterion) {
         let key = "random";
         let offset = writer.offset(key.as_bytes());
 
-        index
-            .insert_indirection(key.as_bytes(), ValueHandle { offset, segment_id })
-            .unwrap();
-
         let mut data = vec![0u8; size_mb * 1_024 * 1_024];
         rng.fill_bytes(&mut data);
+
+        index
+            .insert_indirection(
+                key.as_bytes(),
+                ValueHandle { offset, segment_id },
+                data.len() as u32,
+            )
+            .unwrap();
 
         writer.write(key.as_bytes(), &data).unwrap();
     }
@@ -154,12 +166,16 @@ fn compression(c: &mut Criterion) {
         let key = "good_compression";
         let offset = writer.offset(key.as_bytes());
 
-        index
-            .insert_indirection(key.as_bytes(), ValueHandle { offset, segment_id })
-            .unwrap();
-
         let dummy = b"abcdefgh";
         let data = dummy.repeat(size_mb * 1_024 * 1_024 / dummy.len());
+
+        index
+            .insert_indirection(
+                key.as_bytes(),
+                ValueHandle { offset, segment_id },
+                data.len() as u32,
+            )
+            .unwrap();
 
         writer.write(key.as_bytes(), &data).unwrap();
     }
