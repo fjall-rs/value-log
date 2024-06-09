@@ -226,6 +226,59 @@ impl ValueLog {
         )?)
     }
 
+    /// Tries to find a least-effort-selection of segments to
+    /// merge to react a certain space amplification.
+    #[must_use]
+    pub fn select_segments_for_space_amp_reduction(&self, space_amp_target: f32) -> Vec<SegmentId> {
+        let current_space_amp = self.manifest.space_amp();
+
+        if current_space_amp < space_amp_target {
+            log::trace!("Space amp is <= target {space_amp_target}, nothing to do");
+            vec![]
+        } else {
+            log::debug!("Selecting segments to GC, space_amp_target={space_amp_target}");
+
+            let lock = self.manifest.segments.read().expect("lock is poisoned");
+            let mut segments = lock.values().collect::<Vec<_>>();
+
+            segments.sort_by(|a, b| {
+                b.stale_ratio()
+                    .partial_cmp(&a.stale_ratio())
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+
+            let mut selection = vec![];
+
+            let mut total_bytes = self.manifest.total_bytes();
+            let mut stale_bytes = self.manifest.stale_bytes();
+
+            for segment in segments {
+                let segment_stale_bytes = segment.gc_stats.stale_bytes();
+                stale_bytes -= segment_stale_bytes;
+                total_bytes -= segment_stale_bytes;
+
+                // TODO: investigate why this addition is needed??
+                total_bytes += segment.meta.total_uncompressed_bytes - segment_stale_bytes;
+
+                selection.push(segment.id);
+
+                let space_amp_after_gc =
+                    total_bytes as f32 / (total_bytes as f32 - stale_bytes as f32);
+
+                log::debug!(
+                    "Selected segment #{} for GC: will reduce space amp to {space_amp_after_gc}",
+                    segment.id
+                );
+
+                if space_amp_after_gc <= space_amp_target {
+                    break;
+                }
+            }
+
+            selection
+        }
+    }
+
     /// Finds segment IDs that have reached a stale threshold.
     #[must_use]
     pub fn find_segments_with_stale_threshold(&self, threshold: f32) -> Vec<SegmentId> {
@@ -370,6 +423,9 @@ impl ValueLog {
             }
         }
 
+        log::info!("Total bytes: {}", self.manifest.total_bytes());
+        log::info!("Stale bytes: {}", self.manifest.stale_bytes());
+        log::info!("Space amp: {}", self.manifest.space_amp());
         log::info!("--- GC report done ---");
 
         Ok(())
@@ -387,6 +443,10 @@ impl ValueLog {
         index_reader: &R,
         mut index_writer: W,
     ) -> crate::Result<()> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+
         // IMPORTANT: Only allow 1 rollover or GC at any given time
         let _guard = self.rollover_guard.lock().expect("lock is poisoned");
 

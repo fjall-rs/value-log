@@ -93,7 +93,11 @@ impl MultiWriter {
 
     pub(crate) fn finish(mut self) -> crate::Result<Vec<Writer>> {
         let writer = self.get_active_writer_mut();
-        writer.flush()?;
+
+        if writer.item_count > 0 {
+            writer.flush()?;
+        }
+
         Ok(self.writers)
     }
 }

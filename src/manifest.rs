@@ -285,44 +285,43 @@ impl SegmentManifest {
             .sum::<u64>()
     }
 
-    /*  /// Returns the amount of stale items
+    /// Returns the amount of stale bytes
     #[must_use]
-    pub fn stale_items_count(&self) -> u64 {
+    pub fn total_bytes(&self) -> u64 {
         self.segments
             .read()
             .expect("lock is poisoned")
             .values()
-            .map(|x| x.meta.stale_items())
-            .sum::<u64>()
-    } */
-
-    /// Returns the percent of dead bytes (uncompressed) in the value log
-    #[must_use]
-    pub fn stale_ratio(&self) -> f32 {
-        let used_bytes = self
-            .segments
-            .read()
-            .expect("lock is poisoned")
-            .values()
             .map(|x| x.meta.total_uncompressed_bytes)
-            .sum::<u64>();
-        if used_bytes == 0 {
-            return 0.0;
-        }
+            .sum::<u64>()
+    }
 
-        let stale_bytes = self
-            .segments
+    /// Returns the amount of stale bytes
+    #[must_use]
+    pub fn stale_bytes(&self) -> u64 {
+        self.segments
             .read()
             .expect("lock is poisoned")
             .values()
             .map(|x| x.gc_stats.stale_bytes())
-            .sum::<u64>();
+            .sum::<u64>()
+    }
+
+    /// Returns the percent of dead bytes (uncompressed) in the value log
+    #[must_use]
+    pub fn stale_ratio(&self) -> f32 {
+        let total_bytes = self.total_bytes();
+        if total_bytes == 0 {
+            return 0.0;
+        }
+
+        let stale_bytes = self.stale_bytes();
 
         if stale_bytes == 0 {
             return 0.0;
         }
 
-        stale_bytes as f32 / used_bytes as f32
+        stale_bytes as f32 / total_bytes as f32
     }
 
     /// Returns the approximate space amplification
@@ -330,32 +329,19 @@ impl SegmentManifest {
     /// Returns 0.0 if there are no items.
     #[must_use]
     pub fn space_amp(&self) -> f32 {
-        let used_bytes = self
-            .segments
-            .read()
-            .expect("lock is poisoned")
-            .values()
-            .map(|x| x.meta.total_uncompressed_bytes)
-            .sum::<u64>();
-
-        if used_bytes == 0 {
+        let total_bytes = self.total_bytes();
+        if total_bytes == 0 {
             return 0.0;
         }
 
-        let stale_bytes = self
-            .segments
-            .read()
-            .expect("lock is poisoned")
-            .values()
-            .map(|x| x.gc_stats.stale_bytes())
-            .sum::<u64>();
+        let stale_bytes = self.stale_bytes();
 
-        let alive_bytes = used_bytes - stale_bytes;
+        let alive_bytes = total_bytes - stale_bytes;
         if alive_bytes == 0 {
             return 0.0;
         }
 
-        used_bytes as f32 / alive_bytes as f32
+        total_bytes as f32 / alive_bytes as f32
     }
 }
 

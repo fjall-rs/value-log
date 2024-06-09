@@ -143,8 +143,6 @@ impl Writer {
         };
         metadata.serialize(&mut self.writer)?;
 
-        eprintln!("metadata {metadata:?} @ {metadata_ptr}");
-
         SegmentFileTrailer {
             metadata,
             metadata_ptr,
