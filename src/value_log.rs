@@ -258,7 +258,7 @@ impl ValueLog {
                 total_bytes -= segment_stale_bytes;
 
                 // TODO: investigate why this addition is needed??
-                total_bytes += segment.meta.total_uncompressed_bytes - segment_stale_bytes;
+                /* total_bytes += segment.meta.total_uncompressed_bytes - segment_stale_bytes; */
 
                 selection.push(segment.id);
 
