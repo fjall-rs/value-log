@@ -10,12 +10,12 @@ pub struct GcStats {
 impl GcStats {
     pub fn set_stale_items(&self, x: u64) {
         self.stale_items
-            .store(x, std::sync::atomic::Ordering::Release)
+            .store(x, std::sync::atomic::Ordering::Release);
     }
 
     pub fn set_stale_bytes(&self, x: u64) {
         self.stale_bytes
-            .store(x, std::sync::atomic::Ordering::Release)
+            .store(x, std::sync::atomic::Ordering::Release);
     }
 
     /// Returns the amount of dead items in the segment
