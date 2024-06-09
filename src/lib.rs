@@ -119,3 +119,6 @@ pub use {
 
 #[doc(hidden)]
 pub use mock::{MockIndex, MockIndexWriter};
+
+#[doc(hidden)]
+pub use key_range::KeyRange;

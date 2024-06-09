@@ -1,5 +1,6 @@
+use std::sync::Arc;
 use test_log::test;
-use value_log::{Config, MockIndex, ValueHandle, ValueLog};
+use value_log::{Config, KeyRange, MockIndex, ValueHandle, ValueLog};
 
 #[test]
 fn basic_kv() -> value_log::Result<()> {
@@ -44,6 +45,11 @@ fn basic_kv() -> value_log::Result<()> {
 
         assert_eq!(items.len() as u64, segment.len());
         assert_eq!(0, segment.gc_stats.stale_items());
+
+        assert_eq!(
+            segment.meta.key_range,
+            KeyRange::new((Arc::new(*b"a"), Arc::new(*b"e")))
+        );
 
         assert_eq!(
             segment.len(),

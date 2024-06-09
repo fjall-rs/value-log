@@ -22,6 +22,8 @@ impl std::ops::Deref for KeyRange {
 }
 
 impl KeyRange {
+    #[must_use]
+    /// Creates a new key range
     pub fn new(range: (UserKey, UserKey)) -> Self {
         Self(range)
     }
