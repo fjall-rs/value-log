@@ -294,7 +294,7 @@ impl SegmentManifest {
             .collect()
     }
 
-    /* /// Returns the amount of bytes on disk that are occupied by blobs.
+    /// Returns the amount of bytes on disk that are occupied by blobs.
     #[must_use]
     pub fn disk_space_used(&self) -> u64 {
         self.segments
@@ -303,7 +303,7 @@ impl SegmentManifest {
             .values()
             .map(|x| x.meta.compressed_bytes)
             .sum::<u64>()
-    } */
+    }
 
     /// Returns the amount of stale bytes
     #[must_use]
