@@ -191,7 +191,7 @@ impl SegmentManifest {
                     path: writer.path,
                     meta: Metadata {
                         item_count: writer.item_count,
-                        total_bytes: writer.written_blob_bytes,
+                        compressed_bytes: writer.written_blob_bytes,
                         total_uncompressed_bytes: writer.uncompressed_bytes,
                         key_range: KeyRange::new((
                             writer
@@ -274,16 +274,16 @@ impl SegmentManifest {
             .collect()
     }
 
-    /// Returns the amount of bytes on disk that are occupied by blobs.
+    /* /// Returns the amount of bytes on disk that are occupied by blobs.
     #[must_use]
     pub fn disk_space_used(&self) -> u64 {
         self.segments
             .read()
             .expect("lock is poisoned")
             .values()
-            .map(|x| x.meta.total_bytes)
+            .map(|x| x.meta.compressed_bytes)
             .sum::<u64>()
-    }
+    } */
 
     /// Returns the amount of stale bytes
     #[must_use]

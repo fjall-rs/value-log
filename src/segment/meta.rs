@@ -14,7 +14,7 @@ pub struct Metadata {
     pub item_count: u64,
 
     /// compressed size in bytes (on disk) (without the fixed size trailer)
-    pub total_bytes: u64,
+    pub compressed_bytes: u64,
 
     /// true size in bytes (if no compression were used)
     pub total_uncompressed_bytes: u64,
@@ -32,7 +32,7 @@ impl Serializable for Metadata {
         writer.write_all(METADATA_HEADER_MAGIC)?;
 
         writer.write_u64::<BigEndian>(self.item_count)?;
-        writer.write_u64::<BigEndian>(self.total_bytes)?;
+        writer.write_u64::<BigEndian>(self.compressed_bytes)?;
         writer.write_u64::<BigEndian>(self.total_uncompressed_bytes)?;
 
         self.key_range.serialize(writer)?;
@@ -52,14 +52,14 @@ impl Deserializable for Metadata {
         }
 
         let item_count = reader.read_u64::<BigEndian>()?;
-        let total_bytes = reader.read_u64::<BigEndian>()?;
+        let compressed_bytes = reader.read_u64::<BigEndian>()?;
         let total_uncompressed_bytes = reader.read_u64::<BigEndian>()?;
 
         let key_range = KeyRange::deserialize(reader)?;
 
         Ok(Self {
             item_count,
-            total_bytes,
+            compressed_bytes,
             total_uncompressed_bytes,
             key_range,
         })

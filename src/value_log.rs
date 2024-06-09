@@ -257,9 +257,6 @@ impl ValueLog {
                 stale_bytes -= segment_stale_bytes;
                 total_bytes -= segment_stale_bytes;
 
-                // TODO: investigate why this addition is needed??
-                /* total_bytes += segment.meta.total_uncompressed_bytes - segment_stale_bytes; */
-
                 selection.push(segment.id);
 
                 let space_amp_after_gc =
@@ -416,7 +413,7 @@ impl ValueLog {
             if !size_map.contains_key(id) {
                 log::info!(
                     "Blob file #{id} has no incoming references - can be dropped, freeing {} KiB on disk (userdata={} MiB)",
-                    segment.meta.total_bytes / 1_024,
+                    segment.meta.compressed_bytes / 1_024,
                     segment.meta.total_uncompressed_bytes / 1_024/ 1_024
                 );
                 self.mark_as_stale(&[*id]);

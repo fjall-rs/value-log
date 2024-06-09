@@ -130,7 +130,7 @@ impl Writer {
         // Write metadata
         let metadata = Metadata {
             item_count: self.item_count,
-            total_bytes: self.written_blob_bytes,
+            compressed_bytes: self.written_blob_bytes,
             total_uncompressed_bytes: self.uncompressed_bytes,
             key_range: KeyRange::new((
                 self.first_key
