@@ -20,7 +20,10 @@ impl Default for Config {
 impl Config {
     /// Sets the blob cache.
     ///
-    /// Defaults to a blob cache with 16 MiB of capacity.
+    /// You can create a global [`BlobCache`] and share it between multiple
+    /// value logs to cap global cache memory usage.
+    ///
+    /// Defaults to a blob cache with 16 MiB of capacity *per value log*.
     #[must_use]
     pub fn blob_cache(mut self, blob_cache: Arc<BlobCache>) -> Self {
         self.blob_cache = blob_cache;

@@ -1,8 +1,22 @@
-use crate::{value::UserValue, ValueHandle};
-use quick_cache::{sync::Cache, Weighter};
+use crate::{value::UserValue, value_log::ValueLogId, ValueHandle};
+use quick_cache::{sync::Cache, Equivalent, Weighter};
 
-type CacheKey = ValueHandle;
 type Item = UserValue;
+
+#[derive(Eq, std::hash::Hash, PartialEq)]
+pub struct CacheKey(ValueLogId, ValueHandle);
+
+impl Equivalent<CacheKey> for (ValueLogId, ValueHandle) {
+    fn equivalent(&self, key: &CacheKey) -> bool {
+        self.0 == key.0 && self.1 == key.1
+    }
+}
+
+impl From<(ValueLogId, ValueHandle)> for CacheKey {
+    fn from((vid, handle): (ValueLogId, ValueHandle)) -> Self {
+        Self(vid, handle)
+    }
+}
 
 #[derive(Clone)]
 struct BlobWeighter;
@@ -42,15 +56,15 @@ impl BlobCache {
         }
     }
 
-    pub(crate) fn insert(&self, handle: CacheKey, value: UserValue) {
+    pub(crate) fn insert(&self, key: CacheKey, value: UserValue) {
         if self.capacity > 0 {
-            self.data.insert(handle, value);
+            self.data.insert(key, value);
         }
     }
 
-    pub(crate) fn get(&self, handle: &CacheKey) -> Option<Item> {
+    pub(crate) fn get(&self, key: &CacheKey) -> Option<Item> {
         if self.capacity > 0 {
-            self.data.get(handle)
+            self.data.get(key)
         } else {
             None
         }

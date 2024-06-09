@@ -21,7 +21,7 @@ Generic value log implementation for key-value separated storage, inspired by Ro
 - 100% safe & stable Rust
 - Supports generic KV-index structures (LSM-tree, ...)
 - Built-in per-blob compression (LZ4)
-- In-memory blob cache for hot data
+- In-memory blob cache for hot data, that can be shared between multiple value logs
 
 Keys are limited to 65536 bytes, values are limited to 2^32 bytes.
 

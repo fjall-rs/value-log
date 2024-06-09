@@ -15,8 +15,18 @@ use std::{
     fs::File,
     io::{BufReader, Read, Seek},
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::{atomic::AtomicU64, Arc, Mutex},
 };
+
+/// Unique value log ID
+#[allow(clippy::module_name_repetitions)]
+pub type ValueLogId = u64;
+
+/// Hands out a unique (monotonically increasing) value log ID
+pub fn get_next_vlog_id() -> ValueLogId {
+    static VLOG_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
+    VLOG_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+}
 
 /// A disk-resident value log
 #[derive(Clone)]
@@ -32,6 +42,8 @@ impl std::ops::Deref for ValueLog {
 
 #[allow(clippy::module_name_repetitions)]
 pub struct ValueLogInner {
+    id: u64,
+
     config: Config,
 
     path: PathBuf,
@@ -100,6 +112,7 @@ impl ValueLog {
         let manifest = SegmentManifest::create_new(&path)?;
 
         Ok(Self(Arc::new(ValueLogInner {
+            id: get_next_vlog_id(),
             config,
             path,
             blob_cache,
@@ -138,6 +151,7 @@ impl ValueLog {
             .unwrap_or_default();
 
         Ok(Self(Arc::new(ValueLogInner {
+            id: get_next_vlog_id(),
             config,
             path,
             blob_cache,
@@ -172,7 +186,7 @@ impl ValueLog {
             return Ok(None);
         };
 
-        if let Some(value) = self.blob_cache.get(handle) {
+        if let Some(value) = self.blob_cache.get(&((self.id, handle.clone()).into())) {
             return Ok(Some(value));
         }
 
@@ -193,7 +207,8 @@ impl ValueLog {
 
         let val: UserValue = val.into();
 
-        self.blob_cache.insert(handle.clone(), val.clone());
+        self.blob_cache
+            .insert((self.id, handle.clone()).into(), val.clone());
 
         Ok(Some(val))
     }
