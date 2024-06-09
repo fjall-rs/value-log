@@ -4,11 +4,10 @@ use value_log::{Config, MockIndex, MockIndexWriter, ValueHandle, ValueLog};
 #[test]
 fn basic_gc() -> value_log::Result<()> {
     let folder = tempfile::tempdir()?;
+    let vl_path = folder.path();
 
     let index = MockIndex::default();
 
-    let vl_path = folder.path();
-    std::fs::create_dir_all(vl_path)?;
     let value_log = ValueLog::open(vl_path, Config::default())?;
 
     {
@@ -42,7 +41,7 @@ fn basic_gc() -> value_log::Result<()> {
         let segments = value_log.manifest.list_segments();
 
         assert_eq!(5, segments.first().unwrap().len());
-        assert_eq!(0, segments.first().unwrap().stats.stale_items());
+        assert_eq!(0, segments.first().unwrap().gc_stats.stale_items());
     }
 
     for (key, (handle, _)) in index.read().unwrap().iter() {
@@ -81,7 +80,7 @@ fn basic_gc() -> value_log::Result<()> {
         let segments = value_log.manifest.list_segments();
 
         assert_eq!(5, segments.first().unwrap().len());
-        assert_eq!(0, segments.first().unwrap().stats.stale_items());
+        assert_eq!(0, segments.first().unwrap().gc_stats.stale_items());
     }
 
     for (key, (handle, _)) in index.read().unwrap().iter() {
@@ -100,7 +99,7 @@ fn basic_gc() -> value_log::Result<()> {
         let segments = value_log.manifest.list_segments();
 
         assert_eq!(5, segments.first().unwrap().len());
-        assert_eq!(0, segments.first().unwrap().stats.stale_items());
+        assert_eq!(0, segments.first().unwrap().gc_stats.stale_items());
     }
 
     Ok(())

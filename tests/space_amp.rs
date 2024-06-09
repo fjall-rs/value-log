@@ -4,11 +4,10 @@ use value_log::{Config, MockIndex, ValueHandle, ValueLog};
 #[test]
 fn worst_case_space_amp() -> value_log::Result<()> {
     let folder = tempfile::tempdir()?;
+    let vl_path = folder.path();
 
     let index = MockIndex::default();
 
-    let vl_path = folder.path();
-    std::fs::create_dir_all(vl_path)?;
     let value_log = ValueLog::open(vl_path, Config::default())?;
 
     assert_eq!(0.0, value_log.manifest.space_amp());
@@ -49,11 +48,10 @@ fn worst_case_space_amp() -> value_log::Result<()> {
 #[test]
 fn no_overlap_space_amp() -> value_log::Result<()> {
     let folder = tempfile::tempdir()?;
+    let vl_path = folder.path();
 
     let index = MockIndex::default();
 
-    let vl_path = folder.path();
-    std::fs::create_dir_all(vl_path)?;
     let value_log = ValueLog::open(vl_path, Config::default())?;
 
     assert_eq!(0.0, value_log.manifest.stale_ratio());

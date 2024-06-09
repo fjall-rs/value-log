@@ -93,6 +93,7 @@ mod error;
 mod handle;
 mod id;
 mod index;
+mod key_range;
 mod manifest;
 mod mock;
 mod path;

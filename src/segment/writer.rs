@@ -1,9 +1,9 @@
-use super::stats::SegmentFileTrailer;
-use crate::{id::SegmentId, serde::Serializable};
+use super::{meta::Metadata, trailer::SegmentFileTrailer};
+use crate::{id::SegmentId, key_range::KeyRange, serde::Serializable, value::UserKey};
 use byteorder::{BigEndian, WriteBytesExt};
 use std::{
     fs::File,
-    io::{BufWriter, Write},
+    io::{BufWriter, Seek, Write},
     path::{Path, PathBuf},
 };
 
@@ -12,13 +12,16 @@ pub struct Writer {
     pub(crate) path: PathBuf,
     pub(crate) segment_id: SegmentId,
 
-    inner: BufWriter<File>,
+    writer: BufWriter<File>,
 
     offset: u64,
 
     pub(crate) item_count: u64,
     pub(crate) written_blob_bytes: u64,
     pub(crate) uncompressed_bytes: u64,
+
+    pub first_key: Option<UserKey>,
+    pub last_key: Option<UserKey>,
 }
 
 impl Writer {
@@ -36,11 +39,14 @@ impl Writer {
         Ok(Self {
             path: path.into(),
             segment_id,
-            inner: BufWriter::new(file),
+            writer: BufWriter::new(file),
             offset: 0,
             item_count: 0,
             written_blob_bytes: 0,
             uncompressed_bytes: 0,
+
+            first_key: None,
+            last_key: None,
         })
     }
 
@@ -72,6 +78,11 @@ impl Writer {
         assert!(key.len() <= u16::MAX.into());
         assert!(u32::try_from(value.len()).is_ok());
 
+        if self.first_key.is_none() {
+            self.first_key = Some(key.into());
+        }
+        self.last_key = Some(key.into());
+
         self.uncompressed_bytes += value.len() as u64;
 
         #[cfg(feature = "lz4")]
@@ -83,15 +94,15 @@ impl Writer {
 
         // NOTE: Truncation is okay and actually needed
         #[allow(clippy::cast_possible_truncation)]
-        self.inner.write_u16::<BigEndian>(key.len() as u16)?;
-        self.inner.write_all(key)?;
+        self.writer.write_u16::<BigEndian>(key.len() as u16)?;
+        self.writer.write_all(key)?;
 
-        self.inner.write_u32::<BigEndian>(crc)?;
+        self.writer.write_u32::<BigEndian>(crc)?;
 
         // NOTE: Truncation is okay and actually needed
         #[allow(clippy::cast_possible_truncation)]
-        self.inner.write_u32::<BigEndian>(value.len() as u32)?;
-        self.inner.write_all(&value)?;
+        self.writer.write_u32::<BigEndian>(value.len() as u32)?;
+        self.writer.write_all(&value)?;
 
         self.written_blob_bytes += value.len() as u64;
 
@@ -114,15 +125,34 @@ impl Writer {
     }
 
     pub(crate) fn flush(&mut self) -> crate::Result<()> {
-        SegmentFileTrailer {
+        let metadata_ptr = self.writer.stream_position()?;
+
+        // Write metadata
+        let metadata = Metadata {
             item_count: self.item_count,
             total_bytes: self.written_blob_bytes,
             total_uncompressed_bytes: self.uncompressed_bytes,
-        }
-        .serialize(&mut self.inner)?;
+            key_range: KeyRange::new((
+                self.first_key
+                    .clone()
+                    .expect("should have written at least 1 item"),
+                self.last_key
+                    .clone()
+                    .expect("should have written at least 1 item"),
+            )),
+        };
+        metadata.serialize(&mut self.writer)?;
 
-        self.inner.flush()?;
-        self.inner.get_mut().sync_all()?;
+        eprintln!("metadata {metadata:?} @ {metadata_ptr}");
+
+        SegmentFileTrailer {
+            metadata,
+            metadata_ptr,
+        }
+        .serialize(&mut self.writer)?;
+
+        self.writer.flush()?;
+        self.writer.get_mut().sync_all()?;
 
         Ok(())
     }

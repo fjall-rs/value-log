@@ -60,11 +60,10 @@ impl IndexWriter for DebugIndexWriter {
 #[test]
 fn rollover_index_fail_finish() -> value_log::Result<()> {
     let folder = tempfile::tempdir()?;
+    let vl_path = folder.path();
 
     let index = DebugIndex(Arc::new(RwLock::new(BTreeMap::default())));
 
-    let vl_path = folder.path();
-    std::fs::create_dir_all(vl_path)?;
     let value_log = ValueLog::open(vl_path, Config::default())?;
 
     let items = ["a", "b", "c", "d", "e"];
@@ -97,12 +96,7 @@ fn rollover_index_fail_finish() -> value_log::Result<()> {
     value_log.scan_for_stats(index.read().unwrap().values().cloned().map(Ok))?;
 
     assert_eq!(
-        value_log
-            .manifest
-            .get_segment(0)
-            .unwrap()
-            .stats
-            .stale_ratio(),
+        value_log.manifest.get_segment(0).unwrap().stale_ratio(),
         0.0
     );
 
@@ -121,12 +115,7 @@ fn rollover_index_fail_finish() -> value_log::Result<()> {
     value_log.scan_for_stats(index.read().unwrap().values().cloned().map(Ok))?;
 
     assert_eq!(
-        value_log
-            .manifest
-            .get_segment(0)
-            .unwrap()
-            .stats
-            .stale_ratio(),
+        value_log.manifest.get_segment(0).unwrap().stale_ratio(),
         1.0
     );
 

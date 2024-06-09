@@ -219,7 +219,7 @@ impl ValueLog {
             .read()
             .expect("lock is poisoned")
             .values()
-            .filter(|x| x.stats.stale_ratio() >= threshold)
+            .filter(|x| x.stale_ratio() >= threshold)
             .map(|x| x.id)
             .collect::<Vec<_>>()
     }
@@ -236,7 +236,7 @@ impl ValueLog {
             .read()
             .expect("lock is poisoned")
             .values()
-            .filter(|x| x.stats.is_stale())
+            .filter(|x| x.is_stale())
             .map(|x| x.id)
             .collect::<Vec<_>>();
 
@@ -260,7 +260,7 @@ impl ValueLog {
                 continue;
             };
 
-            segment.stats.mark_as_stale();
+            segment.mark_as_stale();
         }
     }
 
@@ -313,10 +313,10 @@ impl ValueLog {
 
             let segment = self.manifest.get_segment(id).expect("segment should exist");
 
-            let total_bytes = segment.stats.total_uncompressed_bytes;
+            let total_bytes = segment.meta.total_uncompressed_bytes;
             let stale_bytes = total_bytes - used_size;
 
-            let total_items = segment.stats.item_count;
+            let total_items = segment.meta.item_count;
             let stale_items = total_items - alive_item_count;
 
             let space_amp = total_bytes as f64 / used_size as f64;
@@ -329,15 +329,8 @@ impl ValueLog {
                 stale_ratio * 100.0
             );
 
-            segment
-                .stats
-                .stale_bytes
-                .store(stale_bytes, std::sync::atomic::Ordering::Release);
-
-            segment
-                .stats
-                .stale_items
-                .store(stale_items, std::sync::atomic::Ordering::Release);
+            segment.gc_stats.set_stale_bytes(stale_bytes);
+            segment.gc_stats.set_stale_items(stale_items);
         }
 
         for id in self
@@ -355,8 +348,8 @@ impl ValueLog {
             if !size_map.contains_key(id) {
                 log::info!(
                     "Blob file #{id} has no incoming references - can be dropped, freeing {} KiB on disk (userdata={} MiB)",
-                    segment.stats.total_bytes / 1_024,
-                    segment.stats.total_uncompressed_bytes / 1_024/ 1_024
+                    segment.meta.total_bytes / 1_024,
+                    segment.meta.total_uncompressed_bytes / 1_024/ 1_024
                 );
                 self.mark_as_stale(&[*id]);
             }

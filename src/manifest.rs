@@ -1,6 +1,7 @@
 use crate::{
     id::SegmentId,
-    segment::stats::{SegmentFileTrailer, Stats},
+    key_range::KeyRange,
+    segment::{gc_stats::GcStats, meta::Metadata, trailer::SegmentFileTrailer},
     Segment, SegmentWriter as MultiWriter,
 };
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
@@ -8,7 +9,7 @@ use std::{
     collections::HashMap,
     io::{Cursor, Write},
     path::{Path, PathBuf},
-    sync::{atomic::AtomicU64, Arc, RwLock},
+    sync::{Arc, RwLock},
 };
 
 pub const VLOG_MARKER: &str = ".vlog";
@@ -125,11 +126,8 @@ impl SegmentManifest {
                     Arc::new(Segment {
                         id,
                         path,
-                        stats: Stats {
-                            persisted: trailer,
-                            stale_bytes: AtomicU64::default(),
-                            stale_items: AtomicU64::default(),
-                        },
+                        meta: trailer.metadata,
+                        gc_stats: GcStats::default(),
                     }),
                 );
             }
@@ -191,15 +189,22 @@ impl SegmentManifest {
                 Arc::new(Segment {
                     id: segment_id,
                     path: writer.path,
-                    stats: Stats {
-                        persisted: SegmentFileTrailer {
-                            item_count: writer.item_count,
-                            total_bytes: writer.written_blob_bytes,
-                            total_uncompressed_bytes: writer.uncompressed_bytes,
-                        },
-                        stale_items: AtomicU64::default(),
-                        stale_bytes: AtomicU64::default(),
+                    meta: Metadata {
+                        item_count: writer.item_count,
+                        total_bytes: writer.written_blob_bytes,
+                        total_uncompressed_bytes: writer.uncompressed_bytes,
+                        key_range: KeyRange::new((
+                            writer
+                                .first_key
+                                .clone()
+                                .expect("should have written at least 1 item"),
+                            writer
+                                .last_key
+                                .clone()
+                                .expect("should have written at least 1 item"),
+                        )),
                     },
+                    gc_stats: GcStats::default(),
                 }),
             );
 
@@ -276,7 +281,7 @@ impl SegmentManifest {
             .read()
             .expect("lock is poisoned")
             .values()
-            .map(|x| x.stats.total_bytes)
+            .map(|x| x.meta.total_bytes)
             .sum::<u64>()
     }
 
@@ -287,7 +292,7 @@ impl SegmentManifest {
             .read()
             .expect("lock is poisoned")
             .values()
-            .map(|x| x.stats.stale_items())
+            .map(|x| x.meta.stale_items())
             .sum::<u64>()
     } */
 
@@ -299,7 +304,7 @@ impl SegmentManifest {
             .read()
             .expect("lock is poisoned")
             .values()
-            .map(|x| x.stats.total_uncompressed_bytes)
+            .map(|x| x.meta.total_uncompressed_bytes)
             .sum::<u64>();
         if used_bytes == 0 {
             return 0.0;
@@ -310,7 +315,7 @@ impl SegmentManifest {
             .read()
             .expect("lock is poisoned")
             .values()
-            .map(|x| x.stats.stale_bytes())
+            .map(|x| x.gc_stats.stale_bytes())
             .sum::<u64>();
 
         if stale_bytes == 0 {
@@ -330,7 +335,7 @@ impl SegmentManifest {
             .read()
             .expect("lock is poisoned")
             .values()
-            .map(|x| x.stats.total_uncompressed_bytes)
+            .map(|x| x.meta.total_uncompressed_bytes)
             .sum::<u64>();
 
         if used_bytes == 0 {
@@ -342,7 +347,7 @@ impl SegmentManifest {
             .read()
             .expect("lock is poisoned")
             .values()
-            .map(|x| x.stats.stale_bytes())
+            .map(|x| x.gc_stats.stale_bytes())
             .sum::<u64>();
 
         let alive_bytes = used_bytes - stale_bytes;

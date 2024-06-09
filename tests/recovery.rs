@@ -4,11 +4,9 @@ use value_log::{Config, MockIndex, ValueHandle, ValueLog};
 #[test]
 fn basic_recovery() -> value_log::Result<()> {
     let folder = tempfile::tempdir()?;
+    let vl_path = folder.path();
 
     let index = MockIndex::default();
-
-    let vl_path = folder.path();
-    std::fs::create_dir_all(vl_path)?;
 
     let items = ["a", "b", "c", "d", "e"];
 
@@ -44,7 +42,7 @@ fn basic_recovery() -> value_log::Result<()> {
             let segments = value_log.manifest.list_segments();
 
             assert_eq!(items.len() as u64, segments.first().unwrap().len());
-            assert_eq!(0, segments.first().unwrap().stats.stale_items());
+            assert_eq!(0, segments.first().unwrap().gc_stats.stale_items());
         }
 
         for (key, (handle, _)) in index.read().unwrap().iter() {
@@ -64,7 +62,7 @@ fn basic_recovery() -> value_log::Result<()> {
             let segments = value_log.manifest.list_segments();
 
             assert_eq!(items.len() as u64, segments.first().unwrap().len());
-            assert_eq!(0, segments.first().unwrap().stats.stale_items());
+            assert_eq!(0, segments.first().unwrap().gc_stats.stale_items());
         }
 
         for (key, (handle, _)) in index.read().unwrap().iter() {

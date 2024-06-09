@@ -4,11 +4,10 @@ use value_log::{Config, MockIndex, ValueHandle, ValueLog};
 #[test]
 fn basic_kv() -> value_log::Result<()> {
     let folder = tempfile::tempdir()?;
+    let vl_path = folder.path();
 
     let index = MockIndex::default();
 
-    let vl_path = folder.path();
-    std::fs::create_dir_all(vl_path)?;
     let value_log = ValueLog::open(vl_path, Config::default())?;
 
     let items = ["a", "b", "c", "d", "e"];
@@ -44,7 +43,7 @@ fn basic_kv() -> value_log::Result<()> {
         let segment = segments.first().unwrap();
 
         assert_eq!(items.len() as u64, segment.len());
-        assert_eq!(0, segment.stats.stale_items());
+        assert_eq!(0, segment.gc_stats.stale_items());
 
         assert_eq!(
             segment.len(),
