@@ -9,14 +9,15 @@
 //! [k0, v0][k1, v1][k2, v2][k3, v3][k4, v4]
 //!
 //! The value log does not have an index - to efficiently retrieve an item, a
-//! [`ValueHandle`] needs to be retrieved from an [`ExternalIndex`]. Holding a
-//! value handle then allows loading the value from the file by seeking to it.
+//! [`ValueHandle`] needs to be retrieved from an [`ExternalIndex`]. Using the
+//! value handle then allows loading the value from the value log.
 //!
 //! Recently retrieved ("hot") items may be cached by an in-memory value cache to avoid
 //! repeated disk accesses.
 //!
 //! As data changes, old values will unnecessarily occupy disk space. As space amplification
 //! increases, stale data needs to be discarded by rewriting old segments (garbage collection).
+//! This process can happen on-line.
 //!
 //! Even though segments are internally sorted, which may help with range scans, data may not be stored
 //! contiguously, which hurts read performance of ranges. Point reads also require an extra level of
