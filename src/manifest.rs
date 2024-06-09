@@ -154,7 +154,7 @@ impl SegmentManifest {
     }
 
     /// Modifies the level manifest atomically.
-    pub(crate) fn atomic_swap<F: Fn(&mut HashMap<SegmentId, Arc<Segment>>)>(
+    pub(crate) fn atomic_swap<F: FnOnce(&mut HashMap<SegmentId, Arc<Segment>>)>(
         &self,
         f: F,
     ) -> crate::Result<()> {
@@ -188,7 +188,7 @@ impl SegmentManifest {
         let writers = writer.finish()?;
 
         self.atomic_swap(move |recipe| {
-            for writer in &writers {
+            for writer in writers {
                 if writer.item_count == 0 {
                     log::trace!(
                         "Writer at {:?} has written no data, deleting empty vLog segment file",
@@ -209,7 +209,7 @@ impl SegmentManifest {
                     segment_id,
                     Arc::new(Segment {
                         id: segment_id,
-                        path: writer.path.clone(),
+                        path: writer.path,
                         meta: Metadata {
                             item_count: writer.item_count,
                             compressed_bytes: writer.written_blob_bytes,
