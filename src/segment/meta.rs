@@ -19,7 +19,7 @@ pub struct Metadata {
     /// true size in bytes (if no compression were used)
     pub total_uncompressed_bytes: u64,
 
-    // TODO:
+    // TODO: 1.0.0
     ///// What type of compression is used
     // pub compression: CompressionType,
     /// Key range
