@@ -37,7 +37,6 @@
 //!
 //! ```
 //! # use value_log::{ExternalIndex, IndexWriter, MockIndex};
-//! # use std::collections::BTreeMap;
 //! use value_log::{Config, ValueHandle, ValueLog};
 //!
 //! # fn main() -> value_log::Result<()> {
