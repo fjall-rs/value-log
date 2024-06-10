@@ -89,6 +89,7 @@
 #![allow(clippy::missing_const_for_fn)]
 
 mod blob_cache;
+mod compression;
 mod config;
 mod error;
 mod handle;
@@ -106,6 +107,7 @@ mod version;
 
 pub use {
     blob_cache::BlobCache,
+    compression::CompressionType,
     config::Config,
     error::{Error, Result},
     handle::ValueHandle,

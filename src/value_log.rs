@@ -197,15 +197,24 @@ impl ValueLog {
 
         let val_len = reader.read_u32::<BigEndian>()?;
 
-        let mut val = vec![0; val_len as usize];
-        reader.read_exact(&mut val)?;
+        let mut value = vec![0; val_len as usize];
+        reader.read_exact(&mut value)?;
 
-        #[cfg(feature = "lz4")]
-        let val = lz4_flex::decompress_size_prepended(&val).expect("should decompress");
+        let value = match segment.meta.compression {
+            crate::CompressionType::None => value,
+
+            #[cfg(feature = "lz4")]
+            crate::CompressionType::Lz4 => lz4_flex::decompress_size_prepended(&value)
+                .map_err(|_| crate::Error::Decompress(segment.meta.compression))?,
+
+            #[cfg(feature = "miniz")]
+            crate::CompressionType::Miniz => miniz_oxide::inflate::decompress_to_vec(&value)
+                .map_err(|_| crate::Error::Decompress(segment.meta.compression))?,
+        };
 
         // TODO: handle CRC
 
-        let val: UserValue = val.into();
+        let val: UserValue = value.into();
 
         self.blob_cache
             .insert((self.id, handle.clone()).into(), val.clone());
@@ -223,6 +232,7 @@ impl ValueLog {
             self.id_generator.clone(),
             self.config.segment_size_bytes,
             self.path.join(SEGMENTS_FOLDER),
+            self.config.compression,
         )?)
     }
 

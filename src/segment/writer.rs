@@ -1,5 +1,7 @@
 use super::{meta::Metadata, trailer::SegmentFileTrailer};
-use crate::{id::SegmentId, key_range::KeyRange, serde::Serializable, value::UserKey};
+use crate::{
+    id::SegmentId, key_range::KeyRange, serde::Serializable, value::UserKey, CompressionType,
+};
 use byteorder::{BigEndian, WriteBytesExt};
 use std::{
     fs::File,
@@ -20,8 +22,10 @@ pub struct Writer {
     pub(crate) written_blob_bytes: u64,
     pub(crate) uncompressed_bytes: u64,
 
-    pub first_key: Option<UserKey>,
-    pub last_key: Option<UserKey>,
+    pub(crate) first_key: Option<UserKey>,
+    pub(crate) last_key: Option<UserKey>,
+
+    pub(crate) compression: CompressionType,
 }
 
 impl Writer {
@@ -31,7 +35,11 @@ impl Writer {
     ///
     /// Will return `Err` if an IO error occurs.
     #[doc(hidden)]
-    pub fn new<P: AsRef<Path>>(path: P, segment_id: SegmentId) -> std::io::Result<Self> {
+    pub fn new<P: AsRef<Path>>(
+        path: P,
+        segment_id: SegmentId,
+        compression: CompressionType,
+    ) -> std::io::Result<Self> {
         let path = path.as_ref();
 
         let file = File::create(path)?;
@@ -47,6 +55,8 @@ impl Writer {
 
             first_key: None,
             last_key: None,
+
+            compression,
         })
     }
 
@@ -85,8 +95,15 @@ impl Writer {
 
         self.uncompressed_bytes += value.len() as u64;
 
-        #[cfg(feature = "lz4")]
-        let value = lz4_flex::compress_prepend_size(value);
+        let value = match self.compression {
+            CompressionType::None => value.to_vec(),
+
+            #[cfg(feature = "lz4")]
+            CompressionType::Lz4 => lz4_flex::compress_prepend_size(&value),
+
+            #[cfg(feature = "miniz")]
+            CompressionType::Miniz => miniz_oxide::deflate::compress_to_vec(&value, 10),
+        };
 
         let mut hasher = crc32fast::Hasher::new();
         hasher.update(&value);
@@ -140,6 +157,7 @@ impl Writer {
                     .clone()
                     .expect("should have written at least 1 item"),
             )),
+            compression: self.compression,
         };
         metadata.serialize(&mut self.writer)?;
 

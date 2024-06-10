@@ -224,6 +224,7 @@ impl SegmentManifest {
                                     .clone()
                                     .expect("should have written at least 1 item"),
                             )),
+                            compression: writer.compression,
                         },
                         gc_stats: GcStats::default(),
                     }),

@@ -31,7 +31,13 @@ Keys are limited to 65536 bytes, values are limited to 2^32 bytes.
 
 Allows using `LZ4` compression, powered by [`lz4_flex`](https://github.com/PSeitz/lz4_flex).
 
-*Enabled by default.*
+*Disabled by default.*
+
+### miniz
+
+Allows using `DEFLATE/zlib` compression, powered by [`miniz_oxide`](https://github.com/Frommi/miniz_oxide).
+
+*Disabled by default.*
 
 ### serde
 

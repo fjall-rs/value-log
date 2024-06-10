@@ -1,5 +1,8 @@
 use super::writer::Writer;
-use crate::id::{IdGenerator, SegmentId};
+use crate::{
+    id::{IdGenerator, SegmentId},
+    CompressionType,
+};
 use std::path::{Path, PathBuf};
 
 /// Segment writer, may write multiple segments
@@ -8,6 +11,8 @@ pub struct MultiWriter {
     target_size: u64,
     writers: Vec<Writer>,
     id_generator: IdGenerator,
+
+    compression: CompressionType,
 }
 
 impl MultiWriter {
@@ -21,6 +26,7 @@ impl MultiWriter {
         id_generator: IdGenerator,
         target_size: u64,
         folder: P,
+        compression: CompressionType,
     ) -> std::io::Result<Self> {
         let folder = folder.as_ref();
 
@@ -31,7 +37,8 @@ impl MultiWriter {
             id_generator,
             folder: folder.into(),
             target_size,
-            writers: vec![Writer::new(segment_path, segment_id)?],
+            writers: vec![Writer::new(segment_path, segment_id, compression)?],
+            compression,
         })
     }
 
@@ -67,7 +74,7 @@ impl MultiWriter {
         let new_segment_id = self.id_generator.next();
 
         self.writers
-            .push(Writer::new(&self.folder, new_segment_id)?);
+            .push(Writer::new(&self.folder, new_segment_id, self.compression)?);
 
         Ok(())
     }

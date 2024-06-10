@@ -1,6 +1,7 @@
 use crate::{
     serde::{DeserializeError, SerializeError},
     version::Version,
+    CompressionType,
 };
 
 /// Represents errors that can occur in the value-log
@@ -17,6 +18,9 @@ pub enum Error {
 
     /// Deserialization failed
     Deserialize(DeserializeError),
+
+    /// Decompression failed
+    Decompress(CompressionType),
     // TODO:
     // /// CRC check failed
     // CrcMismatch,

@@ -1,4 +1,4 @@
-use crate::blob_cache::BlobCache;
+use crate::{blob_cache::BlobCache, CompressionType};
 use std::sync::Arc;
 
 /// Value log configuration
@@ -6,6 +6,8 @@ use std::sync::Arc;
 pub struct Config {
     pub(crate) segment_size_bytes: u64,
     pub(crate) blob_cache: Arc<BlobCache>,
+
+    pub(crate) compression: CompressionType,
 }
 
 impl Default for Config {
@@ -13,6 +15,9 @@ impl Default for Config {
         Self {
             segment_size_bytes: 256 * 1_024 * 1_024,
             blob_cache: Arc::new(BlobCache::with_capacity_bytes(16 * 1_024 * 1_024)),
+
+            // TODO: setter method
+            compression: CompressionType::None,
         }
     }
 }
