@@ -63,6 +63,12 @@ impl Deserializable for Metadata {
 
         let key_range = KeyRange::deserialize(reader)?;
 
-        Ok(Self { item_count, compressed_bytes, total_uncompressed_bytes, compression, key_range })
+        Ok(Self {
+            item_count,
+            compressed_bytes,
+            total_uncompressed_bytes,
+            compression,
+            key_range,
+        })
     }
 }
