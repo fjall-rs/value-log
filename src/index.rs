@@ -18,9 +18,11 @@ pub trait Reader {
 
 /// Trait that allows writing into an external index
 ///
-/// The write process should be atomic.
+/// The write process should be atomic meaning that until `finish` is called
+/// no written value handles should be handed out by the index.
+/// When `finish` fails, no value handles should be written into the index.
 pub trait Writer {
-    /// Inserts a value handle into the index.
+    /// Inserts a value handle into the write batch.
     ///
     /// # Errors
     ///
