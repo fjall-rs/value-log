@@ -1,3 +1,7 @@
+use crate::serde::{Deserializable, DeserializeError, Serializable, SerializeError};
+use byteorder::{ReadBytesExt, WriteBytesExt};
+use std::io::{Read, Write};
+
 /// Compression type
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[allow(clippy::module_name_repetitions)]
@@ -10,13 +14,12 @@ pub enum CompressionType {
     #[cfg(feature = "lz4")]
     Lz4,
 
-    // TODO: compression level
     /// Zlib/DEFLATE compression (space-optimized)
     #[cfg(feature = "miniz")]
-    Miniz,
+    Miniz(u8),
 }
 
-impl From<CompressionType> for u8 {
+/* impl From<CompressionType> for u8 {
     fn from(val: CompressionType) -> Self {
         match val {
             CompressionType::None => 0,
@@ -46,6 +49,50 @@ impl TryFrom<u8> for CompressionType {
             _ => Err(()),
         }
     }
+} */
+
+impl Serializable for CompressionType {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializeError> {
+        match self {
+            Self::None => {
+                writer.write_u8(0)?;
+            }
+
+            #[cfg(feature = "lz4")]
+            Self::Lz4 => {
+                writer.write_u8(1)?;
+            }
+
+            #[cfg(feature = "miniz")]
+            Self::Miniz(level) => {
+                writer.write_u8(2)?;
+                writer.write_u8(*level)?;
+            }
+        };
+
+        Ok(())
+    }
+}
+
+impl Deserializable for CompressionType {
+    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, DeserializeError> {
+        let tag = reader.read_u8()?;
+
+        match tag {
+            0 => Ok(Self::None),
+
+            #[cfg(feature = "lz4")]
+            1 => Ok(Self::Lz4),
+
+            #[cfg(feature = "miniz")]
+            2 => {
+                let level = reader.read_u8()?;
+                Ok(Self::Miniz(level))
+            }
+
+            tag => Err(DeserializeError::InvalidTag(("CompressionType", tag))),
+        }
+    }
 }
 
 impl std::fmt::Display for CompressionType {
@@ -60,7 +107,7 @@ impl std::fmt::Display for CompressionType {
                 Self::Lz4 => "lz4",
 
                 #[cfg(feature = "miniz")]
-                Self::Miniz => "miniz",
+                Self::Miniz(_) => "miniz",
             }
         )
     }

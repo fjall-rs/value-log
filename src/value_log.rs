@@ -208,7 +208,7 @@ impl ValueLog {
                 .map_err(|_| crate::Error::Decompress(segment.meta.compression))?,
 
             #[cfg(feature = "miniz")]
-            crate::CompressionType::Miniz => miniz_oxide::inflate::decompress_to_vec(&value)
+            crate::CompressionType::Miniz(_) => miniz_oxide::inflate::decompress_to_vec(&value)
                 .map_err(|_| crate::Error::Decompress(segment.meta.compression))?,
         };
 

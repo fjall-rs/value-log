@@ -36,7 +36,7 @@ impl Serializable for Metadata {
         writer.write_u64::<BigEndian>(self.compressed_bytes)?;
         writer.write_u64::<BigEndian>(self.total_uncompressed_bytes)?;
 
-        writer.write_u8(self.compression.into())?;
+        self.compression.serialize(writer)?;
 
         self.key_range.serialize(writer)?;
 
@@ -58,8 +58,7 @@ impl Deserializable for Metadata {
         let compressed_bytes = reader.read_u64::<BigEndian>()?;
         let total_uncompressed_bytes = reader.read_u64::<BigEndian>()?;
 
-        let compression = reader.read_u8()?;
-        let compression = CompressionType::try_from(compression).expect("invalid compression type");
+        let compression = CompressionType::deserialize(reader)?;
 
         let key_range = KeyRange::deserialize(reader)?;
 

@@ -102,7 +102,7 @@ impl Writer {
             CompressionType::Lz4 => lz4_flex::compress_prepend_size(&value),
 
             #[cfg(feature = "miniz")]
-            CompressionType::Miniz => miniz_oxide::deflate::compress_to_vec(&value, 10),
+            CompressionType::Miniz(level) => miniz_oxide::deflate::compress_to_vec(&value, level),
         };
 
         let mut hasher = crc32fast::Hasher::new();
