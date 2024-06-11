@@ -61,7 +61,7 @@ impl<W: IndexWriter> MultiWriter<W> {
     ///
     /// This can be used to index an item into an external `Index`.
     #[must_use]
-    pub fn offset(&self, key: &[u8]) -> u64 {
+    pub(crate) fn offset(&self, key: &[u8]) -> u64 {
         self.get_active_writer().offset()
         // NOTE: Point to the value record, not the key
         // The key is not really needed when dereferencing a value handle
@@ -70,7 +70,7 @@ impl<W: IndexWriter> MultiWriter<W> {
 
     /// Returns the segment ID
     #[must_use]
-    pub fn segment_id(&self) -> SegmentId {
+    pub(crate) fn segment_id(&self) -> SegmentId {
         self.get_active_writer().segment_id()
     }
 

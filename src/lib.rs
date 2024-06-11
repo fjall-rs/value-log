@@ -102,15 +102,14 @@ pub use {
     error::{Error, Result},
     handle::ValueHandle,
     index::{Reader as IndexReader, Writer as IndexWriter},
+    segment::multi_writer::MultiWriter as SegmentWriter,
     value::UserValue,
     value_log::ValueLog,
     version::Version,
 };
 
 #[doc(hidden)]
-pub use segment::{
-    multi_writer::MultiWriter as SegmentWriter, reader::Reader as SegmentReader, Segment,
-};
+pub use segment::{reader::Reader as SegmentReader, Segment};
 
 #[doc(hidden)]
 pub use mock::{MockIndex, MockIndexWriter};
