@@ -248,7 +248,7 @@ impl ValueLog {
     /// merge to reach a certain space amplification.
     #[must_use]
     pub fn select_segments_for_space_amp_reduction(&self, space_amp_target: f32) -> Vec<SegmentId> {
-        let current_space_amp = self.manifest.space_amp();
+        let current_space_amp = self.space_amp();
 
         if current_space_amp < space_amp_target {
             log::trace!("Space amp is <= target {space_amp_target}, nothing to do");
@@ -348,6 +348,14 @@ impl ValueLog {
         }
     }
 
+    /// Returns the approximate space amplification
+    ///
+    /// Returns 0.0 if there are no items.
+    #[must_use]
+    pub fn space_amp(&self) -> f32 {
+        self.manifest.space_amp()
+    }
+
     /// Scans the given index and collecting GC statistics.
     ///
     /// # Errors
@@ -441,7 +449,7 @@ impl ValueLog {
 
         log::info!("Total bytes: {}", self.manifest.total_bytes());
         log::info!("Stale bytes: {}", self.manifest.stale_bytes());
-        log::info!("Space amp: {}", self.manifest.space_amp());
+        log::info!("Space amp: {}", self.space_amp());
         log::info!("--- GC report done ---");
 
         Ok(())

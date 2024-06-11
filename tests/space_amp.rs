@@ -10,7 +10,7 @@ fn worst_case_space_amp() -> value_log::Result<()> {
 
     let value_log = ValueLog::open(vl_path, Config::default())?;
 
-    assert_eq!(0.0, value_log.manifest.space_amp());
+    assert_eq!(0.0, value_log.space_amp());
     assert_eq!(0.0, value_log.manifest.stale_ratio());
 
     let key = "key";
@@ -28,7 +28,7 @@ fn worst_case_space_amp() -> value_log::Result<()> {
 
         value_log.scan_for_stats(index.read().unwrap().values().cloned().map(Ok))?;
 
-        assert_eq!(x as f32, value_log.manifest.space_amp());
+        assert_eq!(x as f32, value_log.space_amp());
 
         if x > 1 {
             assert!((1.0 - (1.0 / x as f32) - value_log.manifest.stale_ratio()) < 0.00001);
@@ -48,7 +48,7 @@ fn no_overlap_space_amp() -> value_log::Result<()> {
     let value_log = ValueLog::open(vl_path, Config::default())?;
 
     assert_eq!(0.0, value_log.manifest.stale_ratio());
-    assert_eq!(0.0, value_log.manifest.space_amp());
+    assert_eq!(0.0, value_log.space_amp());
 
     // NOTE: No blobs overlap, so there are no dead blobs => space amp = 1.0 => perfect space amp
     for i in 0..100 {
@@ -63,7 +63,7 @@ fn no_overlap_space_amp() -> value_log::Result<()> {
 
         value_log.scan_for_stats(index.read().unwrap().values().cloned().map(Ok))?;
 
-        assert_eq!(1.0, value_log.manifest.space_amp());
+        assert_eq!(1.0, value_log.space_amp());
         assert_eq!(0.0, value_log.manifest.stale_ratio());
     }
 

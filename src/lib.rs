@@ -62,7 +62,7 @@
 //! value_log.register_writer(writer)?;
 //!
 //! // Get some stats
-//! assert_eq!(1.0, value_log.manifest.space_amp());
+//! assert_eq!(1.0, value_log.space_amp());
 //! #
 //! # Ok(())
 //! # }

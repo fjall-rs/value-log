@@ -10,7 +10,7 @@ fn gc_space_amp_target_1() -> value_log::Result<()> {
 
     let value_log = ValueLog::open(vl_path, Config::default())?;
 
-    assert_eq!(0.0, value_log.manifest.space_amp());
+    assert_eq!(0.0, value_log.space_amp());
     assert_eq!(0.0, value_log.manifest.stale_ratio());
 
     let key = "key";
@@ -36,7 +36,7 @@ fn gc_space_amp_target_1() -> value_log::Result<()> {
 
     value_log.scan_for_stats(index.read().unwrap().values().cloned().map(Ok))?;
 
-    assert!(value_log.manifest.space_amp() > 2.0);
+    assert!(value_log.space_amp() > 2.0);
 
     {
         let target_space_amp = 8.0;
@@ -46,7 +46,7 @@ fn gc_space_amp_target_1() -> value_log::Result<()> {
         value_log.drop_stale_segments()?;
 
         value_log.scan_for_stats(index.read().unwrap().values().cloned().map(Ok))?;
-        assert!(value_log.manifest.space_amp() <= target_space_amp);
+        assert!(value_log.space_amp() <= target_space_amp);
     }
 
     {
@@ -57,7 +57,7 @@ fn gc_space_amp_target_1() -> value_log::Result<()> {
         value_log.drop_stale_segments()?;
 
         value_log.scan_for_stats(index.read().unwrap().values().cloned().map(Ok))?;
-        assert!(value_log.manifest.space_amp() <= target_space_amp);
+        assert!(value_log.space_amp() <= target_space_amp);
     }
 
     Ok(())
