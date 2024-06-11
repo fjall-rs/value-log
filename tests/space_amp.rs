@@ -1,5 +1,5 @@
 use test_log::test;
-use value_log::{Config, MockIndex, ValueHandle, ValueLog};
+use value_log::{Config, MockIndex, MockIndexWriter, ValueLog};
 
 #[test]
 fn worst_case_space_amp() -> value_log::Result<()> {
@@ -19,18 +19,11 @@ fn worst_case_space_amp() -> value_log::Result<()> {
     // NOTE: Write a single item 10x
     // -> should result in space amp = 10.0x
     for x in 1..=10 {
-        let mut writer = value_log.get_writer()?;
-        let segment_id = writer.segment_id();
-
-        let offset = writer.offset(key.as_bytes());
-
-        index.insert_indirection(
-            key.as_bytes(),
-            ValueHandle { offset, segment_id },
-            value.len() as u32,
-        )?;
+        let index_writer = MockIndexWriter(index.clone());
+        let mut writer = value_log.get_writer(index_writer)?;
 
         writer.write(key.as_bytes(), value.as_bytes())?;
+
         value_log.register(writer)?;
 
         value_log.scan_for_stats(index.read().unwrap().values().cloned().map(Ok))?;
@@ -62,16 +55,8 @@ fn no_overlap_space_amp() -> value_log::Result<()> {
         let key = i.to_string();
         let value = "afsasfdfasdfsda";
 
-        let mut writer = value_log.get_writer()?;
-        let segment_id = writer.segment_id();
-
-        let offset = writer.offset(key.as_bytes());
-
-        index.insert_indirection(
-            key.as_bytes(),
-            ValueHandle { offset, segment_id },
-            value.len() as u32,
-        )?;
+        let index_writer = MockIndexWriter(index.clone());
+        let mut writer = value_log.get_writer(index_writer)?;
 
         writer.write(key.as_bytes(), value.as_bytes())?;
         value_log.register(writer)?;

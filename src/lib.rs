@@ -36,7 +36,7 @@
 //! # Example usage
 //!
 //! ```
-//! # use value_log::{IndexReader, IndexWriter, MockIndex};
+//! # use value_log::{IndexReader, IndexWriter, MockIndex, MockIndexWriter};
 //! use value_log::{Config, ValueHandle, ValueLog};
 //!
 //! # fn main() -> value_log::Result<()> {
@@ -48,21 +48,12 @@
 //! let value_log = ValueLog::open(path, Config::default())?;
 //!
 //! // Write some data
-//! let mut writer = value_log.get_writer()?;
-//! let segment_id = writer.segment_id();
+//! # let index_writer = MockIndexWriter(index.clone());
+//! let mut writer = value_log.get_writer(index_writer)?;
 //!
 //! for key in ["a", "b", "c", "d", "e"] {
 //!     let value = key.repeat(1_000);
 //!     let value = value.as_bytes();
-//!
-//!     let offset = writer.offset(key.as_bytes());
-//!
-//!     // NOTE: The data written to the value log is only stable
-//!     // after the writer is registered in the value log (see below)
-//!     //
-//!     // When implementing the ExternalIndex trait, it's important to
-//!     // not hand out ValueHandles before that point in time
-//!     index.insert_indirection(key.as_bytes(), ValueHandle { offset, segment_id }, value.len() as u32)?;
 //!
 //!     writer.write(key.as_bytes(), value)?;
 //! }

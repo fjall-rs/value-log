@@ -1,5 +1,5 @@
 use test_log::test;
-use value_log::{Config, MockIndex, MockIndexWriter, ValueHandle, ValueLog};
+use value_log::{Config, MockIndex, MockIndexWriter, ValueLog};
 
 #[test]
 fn gc_space_amp_target_1() -> value_log::Result<()> {
@@ -19,30 +19,15 @@ fn gc_space_amp_target_1() -> value_log::Result<()> {
     // NOTE: Write a single item 10x
     // -> should result in space amp = 10.0x
     for x in 1..=10 {
-        let mut writer = value_log.get_writer()?;
-        let segment_id = writer.segment_id();
+        let index_writer = MockIndexWriter(index.clone());
+        let mut writer = value_log.get_writer(index_writer)?;
 
-        {
-            let offset = writer.offset(key.as_bytes());
-
-            index.insert_indirection(
-                key.as_bytes(),
-                ValueHandle { offset, segment_id },
-                value.len() as u32,
-            )?;
-            writer.write(key.as_bytes(), value.as_bytes())?;
-        }
+        writer.write(key.as_bytes(), value.as_bytes())?;
 
         {
             let key = format!("key{x}");
             let value = "value";
-            let offset = writer.offset(key.as_bytes());
 
-            index.insert_indirection(
-                key.as_bytes(),
-                ValueHandle { offset, segment_id },
-                value.len() as u32,
-            )?;
             writer.write(key.as_bytes(), value.as_bytes())?;
         }
 

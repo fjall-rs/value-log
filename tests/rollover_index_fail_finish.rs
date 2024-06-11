@@ -69,26 +69,18 @@ fn rollover_index_fail_finish() -> value_log::Result<()> {
     let items = ["a", "b", "c", "d", "e"];
 
     {
-        let mut writer = value_log.get_writer()?;
-
-        let segment_id = writer.segment_id();
+        let index_writer = DebugIndexWriter(index.clone());
+        let mut writer = value_log.get_writer(index_writer)?;
 
         for key in &items {
             let value = key.repeat(1_000);
             let value = value.as_bytes();
 
-            let offset = writer.offset(key.as_bytes());
-
-            index.insert_indirection(
-                key.as_bytes(),
-                ValueHandle { offset, segment_id },
-                value.len() as u32,
-            )?;
-
             writer.write(key.as_bytes(), value)?;
         }
 
-        value_log.register(writer)?;
+        // NOTE: Should return error because index fails
+        assert!(value_log.register(writer).is_err());
     }
 
     assert_eq!(value_log.manifest.list_segment_ids(), [0]);

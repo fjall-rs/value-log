@@ -2,7 +2,7 @@ use crate::{
     id::SegmentId,
     key_range::KeyRange,
     segment::{gc_stats::GcStats, meta::Metadata, trailer::SegmentFileTrailer},
-    Segment, SegmentWriter as MultiWriter,
+    IndexWriter, Segment, SegmentWriter as MultiWriter,
 };
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::{
@@ -184,8 +184,8 @@ impl SegmentManifest {
         })
     }
 
-    pub fn register(&self, writer: MultiWriter) -> crate::Result<()> {
-        let writers = writer.finish()?;
+    pub fn register<W: IndexWriter>(&self, writer: MultiWriter<W>) -> crate::Result<()> {
+        let (writers, index_writer) = writer.finish()?;
 
         self.atomic_swap(move |recipe| {
             for writer in writers {
@@ -236,7 +236,11 @@ impl SegmentManifest {
                     writer.uncompressed_bytes,
                 );
             }
-        })
+        })?;
+
+        index_writer.finish()?;
+
+        Ok(())
     }
 
     fn write_to_disk<P: AsRef<Path>>(path: P, segment_ids: &[SegmentId]) -> crate::Result<()> {

@@ -1,5 +1,5 @@
 use test_log::test;
-use value_log::{Config, MockIndex, ValueHandle, ValueLog};
+use value_log::{Config, MockIndex, MockIndexWriter, ValueLog};
 
 #[test]
 fn basic_recovery() -> value_log::Result<()> {
@@ -14,21 +14,12 @@ fn basic_recovery() -> value_log::Result<()> {
         let value_log = ValueLog::open(vl_path, Config::default())?;
 
         {
-            let mut writer = value_log.get_writer()?;
-
-            let segment_id = writer.segment_id();
+            let index_writer = MockIndexWriter(index.clone());
+            let mut writer = value_log.get_writer(index_writer)?;
 
             for key in &items {
                 let value = key.repeat(1_000);
                 let value = value.as_bytes();
-
-                let offset = writer.offset(key.as_bytes());
-
-                index.insert_indirection(
-                    key.as_bytes(),
-                    ValueHandle { offset, segment_id },
-                    value.len() as u32,
-                )?;
 
                 writer.write(key.as_bytes(), value)?;
             }

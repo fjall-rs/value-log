@@ -173,7 +173,7 @@ impl ValueLog {
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    pub fn register(&self, writer: SegmentWriter) -> crate::Result<()> {
+    pub fn register<W: IndexWriter>(&self, writer: SegmentWriter<W>) -> crate::Result<()> {
         self.manifest.register(writer)
     }
 
@@ -234,11 +234,12 @@ impl ValueLog {
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    pub fn get_writer(&self) -> crate::Result<SegmentWriter> {
+    pub fn get_writer<W: IndexWriter>(&self, index_writer: W) -> crate::Result<SegmentWriter<W>> {
         Ok(SegmentWriter::new(
             self.id_generator.clone(),
             self.config.segment_size_bytes,
             self.path.join(SEGMENTS_FOLDER),
+            index_writer,
             self.config.compression,
         )?)
     }
@@ -478,7 +479,7 @@ impl ValueLog {
         &self,
         ids: &[u64],
         index_reader: &R,
-        mut index_writer: W,
+        index_writer: W,
     ) -> crate::Result<()> {
         if ids.is_empty() {
             return Ok(());
@@ -505,7 +506,7 @@ impl ValueLog {
 
         let reader = MergeReader::new(readers);
 
-        let mut writer = self.get_writer()?;
+        let mut writer = self.get_writer(index_writer)?;
 
         for item in reader {
             let (k, v, segment_id) = item?;
@@ -517,7 +518,7 @@ impl ValueLog {
                 _ => {}
             }
 
-            let segment_id = writer.segment_id();
+            /* let segment_id = writer.segment_id();
             let offset = writer.offset(&k);
 
             log::trace!(
@@ -529,7 +530,7 @@ impl ValueLog {
                 &k,
                 ValueHandle { segment_id, offset },
                 v.len() as u32,
-            )?;
+            )?; */
             writer.write(&k, &v)?;
         }
 
@@ -537,9 +538,9 @@ impl ValueLog {
         // to avoid dangling pointers
         self.manifest.register(writer)?;
 
-        // NOTE: If we crash before before finishing the index write, it's fine
+        /*  // NOTE: If we crash before before finishing the index write, it's fine
         // because all new segments will be unreferenced, and thus can be deleted
-        index_writer.finish()?;
+        index_writer.finish()?; */
 
         // IMPORTANT: We only mark the segments as definitely stale
         // The external index needs to decide when it is safe to drop
