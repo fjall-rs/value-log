@@ -173,7 +173,7 @@ impl ValueLog {
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    pub fn register_writer<W: IndexWriter>(&self, writer: SegmentWriter<W>) -> crate::Result<()> {
+    pub fn register_writer<W: IndexWriter>(&self, writer: SegmentWriter<W>) -> crate::Result<W> {
         self.manifest.register(writer)
     }
 
@@ -514,41 +514,25 @@ impl ValueLog {
 
         let reader = MergeReader::new(readers);
 
-        let mut writer = self.get_writer(index_writer)?;
+        // IMPORTANT: Set separation size to 0 just in case
+        let mut writer = self.get_writer(index_writer)?.blob_separation_size(0);
 
         for item in reader {
             let (k, v, segment_id) = item?;
 
             match index_reader.get(&k)? {
                 // If this value is in an older segment, we can discard it
-                Some(x) if segment_id < x.segment_id => continue,
+                Some(vhandle) if segment_id < vhandle.segment_id => continue,
                 None => continue,
                 _ => {}
             }
 
-            /* let segment_id = writer.segment_id();
-            let offset = writer.offset(&k);
-
-            log::trace!(
-                "GC: inserting indirection: {segment_id:?}:{offset:?} => {:?}",
-                String::from_utf8_lossy(&k)
-            );
-
-            index_writer.insert_indirection(
-                &k,
-                ValueHandle { segment_id, offset },
-                v.len() as u32,
-            )?; */
             writer.write(&k, &v)?;
         }
 
         // IMPORTANT: New segments need to be persisted before adding to index
         // to avoid dangling pointers
         self.manifest.register(writer)?;
-
-        /*  // NOTE: If we crash before before finishing the index write, it's fine
-        // because all new segments will be unreferenced, and thus can be deleted
-        index_writer.finish()?; */
 
         // IMPORTANT: We only mark the segments as definitely stale
         // The external index needs to decide when it is safe to drop

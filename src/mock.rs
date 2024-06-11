@@ -51,7 +51,11 @@ impl IndexReader for MockIndex {
 pub struct MockIndexWriter(pub MockIndex);
 
 impl IndexWriter for MockIndexWriter {
-    fn insert_indirection(
+    fn insert_direct(&mut self, _key: &[u8], _value: &[u8]) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    fn insert_indirect(
         &mut self,
         key: &[u8],
         value: ValueHandle,
@@ -60,7 +64,7 @@ impl IndexWriter for MockIndexWriter {
         self.0.insert_indirection(key, value, size)
     }
 
-    fn finish(self) -> std::io::Result<()> {
+    fn finish(&mut self) -> std::io::Result<()> {
         Ok(())
     }
 }

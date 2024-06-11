@@ -11,11 +11,13 @@ pub struct MultiWriter<W: IndexWriter> {
     target_size: u64,
 
     writers: Vec<Writer>,
-    pub(crate) index_writer: W,
+    pub(crate) index_writer: W, // TODO: only need a (mutable) reference??
 
     id_generator: IdGenerator,
 
     compression: CompressionType,
+
+    blob_separation_size: usize,
 }
 
 impl<W: IndexWriter> MultiWriter<W> {
@@ -46,7 +48,14 @@ impl<W: IndexWriter> MultiWriter<W> {
             index_writer,
 
             compression,
+            blob_separation_size: 2_048,
         })
+    }
+
+    /// Sets the separation threshold for blobs
+    pub fn blob_separation_size(mut self, bytes: usize) -> Self {
+        self.blob_separation_size = bytes;
+        self
     }
 
     fn get_active_writer(&self) -> &Writer {
@@ -79,9 +88,10 @@ impl<W: IndexWriter> MultiWriter<W> {
         log::debug!("Rotating segment writer");
 
         let new_segment_id = self.id_generator.next();
+        let segment_path = self.folder.join(new_segment_id.to_string());
 
         self.writers
-            .push(Writer::new(&self.folder, new_segment_id, self.compression)?);
+            .push(Writer::new(segment_path, new_segment_id, self.compression)?);
 
         Ok(())
     }
@@ -102,22 +112,32 @@ impl<W: IndexWriter> MultiWriter<W> {
         let target_size = self.target_size;
 
         // Give value handle to index writer
-        let segment_id = self.segment_id();
-        let offset = self.offset(key);
-        let vhandle = ValueHandle { segment_id, offset };
+        let bytes_written = if value.len() >= self.blob_separation_size {
+            let segment_id = self.segment_id();
+            let offset = self.offset(key);
+            let vhandle = ValueHandle { segment_id, offset };
 
-        log::trace!(
-            "GC: inserting indirection: {segment_id:?}:{offset:?} => {:?}",
-            String::from_utf8_lossy(key)
-        );
+            log::trace!(
+                "inserting indirection: {vhandle:?} => {:?}",
+                String::from_utf8_lossy(key)
+            );
 
-        self.index_writer
-            .insert_indirection(key, vhandle, value.len() as u32)?;
+            self.index_writer
+                .insert_indirect(key, vhandle, value.len() as u32)?;
+
+            // Write actual value into segment
+            let writer = self.get_active_writer_mut();
+
+            writer.write(key, value)?
+        } else {
+            log::trace!("GC: inserting direct: {:?}", String::from_utf8_lossy(key));
+            self.index_writer.insert_direct(key, value)?;
+
+            0
+        };
 
         // Write actual value into segment
         let writer = self.get_active_writer_mut();
-
-        let bytes_written = writer.write(key, value)?;
 
         // Check for segment size target, maybe rotate to next writer
         if writer.offset() >= target_size {

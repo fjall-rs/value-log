@@ -14,7 +14,7 @@ fn worst_case_space_amp() -> value_log::Result<()> {
     assert_eq!(0.0, value_log.manifest.stale_ratio());
 
     let key = "key";
-    let value = "value";
+    let value = "value".repeat(5_000);
 
     // NOTE: Write a single item 10x
     // -> should result in space amp = 10.0x
@@ -53,7 +53,7 @@ fn no_overlap_space_amp() -> value_log::Result<()> {
     // NOTE: No blobs overlap, so there are no dead blobs => space amp = 1.0 => perfect space amp
     for i in 0..100 {
         let key = i.to_string();
-        let value = "afsasfdfasdfsda";
+        let value = "afsasfdfasdfsda".repeat(5_000);
 
         let index_writer = MockIndexWriter(index.clone());
         let mut writer = value_log.get_writer(index_writer)?;

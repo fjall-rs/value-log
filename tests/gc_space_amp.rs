@@ -14,7 +14,7 @@ fn gc_space_amp_target_1() -> value_log::Result<()> {
     assert_eq!(0.0, value_log.manifest.stale_ratio());
 
     let key = "key";
-    let value = "value".repeat(4);
+    let value = "value".repeat(20_000);
 
     // NOTE: Write a single item 10x
     // -> should result in space amp = 10.0x
@@ -26,7 +26,7 @@ fn gc_space_amp_target_1() -> value_log::Result<()> {
 
         {
             let key = format!("key{x}");
-            let value = "value";
+            let value = "value".repeat(5_000);
 
             writer.write(key.as_bytes(), value.as_bytes())?;
         }

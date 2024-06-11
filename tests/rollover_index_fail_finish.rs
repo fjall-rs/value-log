@@ -43,7 +43,11 @@ impl IndexReader for DebugIndex {
 pub struct DebugIndexWriter(DebugIndex);
 
 impl IndexWriter for DebugIndexWriter {
-    fn insert_indirection(
+    fn insert_direct(&mut self, _: &[u8], _: &[u8]) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    fn insert_indirect(
         &mut self,
         key: &[u8],
         value: ValueHandle,
@@ -52,7 +56,7 @@ impl IndexWriter for DebugIndexWriter {
         self.0.insert_indirection(key, value, size)
     }
 
-    fn finish(self) -> std::io::Result<()> {
+    fn finish(&mut self) -> std::io::Result<()> {
         Err(std::io::Error::new(std::io::ErrorKind::Other, "Oh no"))
     }
 }
@@ -73,7 +77,7 @@ fn rollover_index_fail_finish() -> value_log::Result<()> {
         let mut writer = value_log.get_writer(index_writer)?;
 
         for key in &items {
-            let value = key.repeat(1_000);
+            let value = key.repeat(10_000);
             let value = value.as_bytes();
 
             writer.write(key.as_bytes(), value)?;

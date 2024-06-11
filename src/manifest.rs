@@ -184,8 +184,8 @@ impl SegmentManifest {
         })
     }
 
-    pub fn register<W: IndexWriter>(&self, writer: MultiWriter<W>) -> crate::Result<()> {
-        let (writers, index_writer) = writer.finish()?;
+    pub fn register<W: IndexWriter>(&self, writer: MultiWriter<W>) -> crate::Result<W> {
+        let (writers, mut index_writer) = writer.finish()?;
 
         self.atomic_swap(move |recipe| {
             for writer in writers {
@@ -238,9 +238,12 @@ impl SegmentManifest {
             }
         })?;
 
+        // NOTE: If we crash before before finishing the index write, it's fine
+        // because all new segments will be unreferenced, and thus can be dropped because stale
+
         index_writer.finish()?;
 
-        Ok(())
+        Ok(index_writer)
     }
 
     fn write_to_disk<P: AsRef<Path>>(path: P, segment_ids: &[SegmentId]) -> crate::Result<()> {
@@ -352,7 +355,7 @@ impl SegmentManifest {
 
     /// Returns the approximate space amplification
     ///
-    /// Returns 0.0 if there are no items.
+    /// Returns 0.0 if there are no items or the entire value log is stale.
     #[must_use]
     pub fn space_amp(&self) -> f32 {
         let total_bytes = self.total_bytes();

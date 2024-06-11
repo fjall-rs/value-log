@@ -52,7 +52,7 @@
 //! let mut writer = value_log.get_writer(index_writer)?;
 //!
 //! for key in ["a", "b", "c", "d", "e"] {
-//!     let value = key.repeat(1_000);
+//!     let value = key.repeat(10_000);
 //!     let value = value.as_bytes();
 //!
 //!     writer.write(key.as_bytes(), value)?;

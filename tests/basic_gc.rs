@@ -17,7 +17,7 @@ fn basic_gc() -> value_log::Result<()> {
         let mut writer = value_log.get_writer(index_writer)?;
 
         for key in &items {
-            let value = key.repeat(1_000);
+            let value = key.repeat(10_000);
             let value = value.as_bytes();
 
             writer.write(key.as_bytes(), value)?;
@@ -37,7 +37,7 @@ fn basic_gc() -> value_log::Result<()> {
 
     for (key, (handle, _)) in index.read().unwrap().iter() {
         let item = value_log.get(handle)?.unwrap();
-        assert_eq!(item, key.repeat(1_000).into());
+        assert_eq!(item, key.repeat(10_000).into());
     }
 
     {
@@ -47,7 +47,7 @@ fn basic_gc() -> value_log::Result<()> {
         let mut writer = value_log.get_writer(index_writer)?;
 
         for key in &items {
-            let value = key.repeat(1_000);
+            let value = key.repeat(10_000);
             let value = value.as_bytes();
 
             writer.write(key.as_bytes(), value)?;
@@ -67,7 +67,7 @@ fn basic_gc() -> value_log::Result<()> {
 
     for (key, (handle, _)) in index.read().unwrap().iter() {
         let item = value_log.get(handle)?.unwrap();
-        assert_eq!(item, key.repeat(1_000).into());
+        assert_eq!(item, key.repeat(10_000).into());
     }
 
     value_log.major_compact(&index, MockIndexWriter(index.clone()))?;
