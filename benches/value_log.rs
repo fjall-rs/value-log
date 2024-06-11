@@ -55,7 +55,7 @@ fn load_value(c: &mut Criterion) {
             writer.write(key.as_bytes(), &data).unwrap();
         }
 
-        value_log.register(writer).unwrap();
+        value_log.register_writer(writer).unwrap();
 
         for size in sizes {
             let key = size.to_string();
@@ -105,7 +105,7 @@ fn load_value(c: &mut Criterion) {
             writer.write(key.as_bytes(), &data).unwrap();
         }
 
-        value_log.register(writer).unwrap();
+        value_log.register_writer(writer).unwrap();
 
         for size in sizes {
             let key = size.to_string();
@@ -180,7 +180,7 @@ fn compression(c: &mut Criterion) {
         writer.write(key.as_bytes(), &data).unwrap();
     }
 
-    value_log.register(writer).unwrap();
+    value_log.register_writer(writer).unwrap();
 
     let handle_random = index.get(b"random").unwrap().unwrap();
     let handle_good_compression = index.get(b"good_compression").unwrap().unwrap();

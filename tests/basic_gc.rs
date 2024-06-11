@@ -23,7 +23,7 @@ fn basic_gc() -> value_log::Result<()> {
             writer.write(key.as_bytes(), value)?;
         }
 
-        value_log.register(writer)?;
+        value_log.register_writer(writer)?;
     }
 
     {
@@ -53,7 +53,7 @@ fn basic_gc() -> value_log::Result<()> {
             writer.write(key.as_bytes(), value)?;
         }
 
-        value_log.register(writer)?;
+        value_log.register_writer(writer)?;
     }
 
     {

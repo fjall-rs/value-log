@@ -31,7 +31,7 @@ fn gc_space_amp_target_1() -> value_log::Result<()> {
             writer.write(key.as_bytes(), value.as_bytes())?;
         }
 
-        value_log.register(writer)?;
+        value_log.register_writer(writer)?;
     }
 
     value_log.scan_for_stats(index.read().unwrap().values().cloned().map(Ok))?;

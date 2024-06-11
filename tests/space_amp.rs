@@ -24,7 +24,7 @@ fn worst_case_space_amp() -> value_log::Result<()> {
 
         writer.write(key.as_bytes(), value.as_bytes())?;
 
-        value_log.register(writer)?;
+        value_log.register_writer(writer)?;
 
         value_log.scan_for_stats(index.read().unwrap().values().cloned().map(Ok))?;
 
@@ -59,7 +59,7 @@ fn no_overlap_space_amp() -> value_log::Result<()> {
         let mut writer = value_log.get_writer(index_writer)?;
 
         writer.write(key.as_bytes(), value.as_bytes())?;
-        value_log.register(writer)?;
+        value_log.register_writer(writer)?;
 
         value_log.scan_for_stats(index.read().unwrap().values().cloned().map(Ok))?;
 

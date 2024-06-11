@@ -80,7 +80,7 @@ fn rollover_index_fail_finish() -> value_log::Result<()> {
         }
 
         // NOTE: Should return error because index fails
-        assert!(value_log.register(writer).is_err());
+        assert!(value_log.register_writer(writer).is_err());
     }
 
     assert_eq!(value_log.manifest.list_segment_ids(), [0]);

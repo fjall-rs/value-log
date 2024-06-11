@@ -173,7 +173,7 @@ impl ValueLog {
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    pub fn register<W: IndexWriter>(&self, writer: SegmentWriter<W>) -> crate::Result<()> {
+    pub fn register_writer<W: IndexWriter>(&self, writer: SegmentWriter<W>) -> crate::Result<()> {
         self.manifest.register(writer)
     }
 
