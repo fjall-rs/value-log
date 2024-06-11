@@ -20,18 +20,9 @@ impl std::ops::Deref for MockIndex {
 }
 
 impl MockIndex {
-    /// Used for tests only
-    pub fn insert_indirection(
-        &self,
-        key: &[u8],
-        value: ValueHandle,
-        size: u32,
-    ) -> std::io::Result<()> {
-        self.write()
-            .expect("lock is poisoned")
-            .insert(key.into(), (value, size));
-
-        Ok(())
+    /// Remove item
+    pub fn remove(&self, key: &[u8]) {
+        self.0.write().expect("lock is poisoned").remove(key);
     }
 }
 
@@ -61,7 +52,11 @@ impl IndexWriter for MockIndexWriter {
         value: ValueHandle,
         size: u32,
     ) -> std::io::Result<()> {
-        self.0.insert_indirection(key, value, size)
+        self.0
+            .write()
+            .expect("lock is poisoned")
+            .insert(key.into(), (value, size));
+        Ok(())
     }
 
     fn finish(&mut self) -> std::io::Result<()> {
