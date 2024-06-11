@@ -4,9 +4,13 @@ use std::sync::Arc;
 /// Value log configuration
 #[derive(Debug)]
 pub struct Config {
+    /// Target size of vLog segments
     pub(crate) segment_size_bytes: u64,
+
+    /// Blob cache to use
     pub(crate) blob_cache: Arc<BlobCache>,
 
+    /// Compression to use
     pub(crate) compression: CompressionType,
 }
 
@@ -23,6 +27,17 @@ impl Default for Config {
 }
 
 impl Config {
+    /// Sets the compression type to use.
+    ///
+    /// Using compression is recommended, see [`CompressionType`].
+    ///
+    /// Default = none
+    #[must_use]
+    pub fn compression(mut self, compression: CompressionType) -> Self {
+        self.compression = compression;
+        self
+    }
+
     /// Sets the blob cache.
     ///
     /// You can create a global [`BlobCache`] and share it between multiple

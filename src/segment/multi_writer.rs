@@ -84,11 +84,15 @@ impl MultiWriter {
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    pub fn write(&mut self, key: &[u8], value: &[u8]) -> crate::Result<u32> {
+    pub fn write<K: AsRef<[u8]>, V: AsRef<[u8]>>(
+        &mut self,
+        key: K,
+        value: V,
+    ) -> crate::Result<u32> {
         let target_size = self.target_size;
 
         let writer = self.get_active_writer_mut();
-        let bytes_written = writer.write(key, value)?;
+        let bytes_written = writer.write(key.as_ref(), value.as_ref())?;
 
         if writer.offset() >= target_size {
             writer.flush()?;

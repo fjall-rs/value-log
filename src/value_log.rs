@@ -438,6 +438,18 @@ impl ValueLog {
         Ok(())
     }
 
+    #[doc(hidden)]
+    pub fn get_reader(&self) -> std::io::Result<MergeReader> {
+        let segments = self.manifest.segments.read().expect("lock is poisoned");
+
+        let readers = segments
+            .values()
+            .map(|x| x.scan())
+            .collect::<std::io::Result<Vec<_>>>()?;
+
+        Ok(MergeReader::new(readers))
+    }
+
     /// Rewrites some segments into new segment(s), blocking the caller
     /// until the operation is completely done.
     ///
