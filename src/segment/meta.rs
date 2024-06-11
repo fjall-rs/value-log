@@ -6,7 +6,7 @@ use crate::{
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::io::{Read, Write};
 
-pub const METADATA_HEADER_MAGIC: &[u8] = &[b'F', b'J', b'L', b'L', b'S', b'M', b'D', b'1'];
+pub const METADATA_HEADER_MAGIC: &[u8] = &[b'V', b'L', b'O', b'G', b'S', b'M', b'D', b'1'];
 
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
