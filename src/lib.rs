@@ -9,7 +9,7 @@
 //! [k0, v0][k1, v1][k2, v2][k3, v3][k4, v4]
 //!
 //! The value log does not have an index - to efficiently retrieve an item, a
-//! [`ValueHandle`] needs to be retrieved from an [`ExternalIndex`]. Using the
+//! [`ValueHandle`] needs to be retrieved from an [`IndexReader`]. Using the
 //! value handle then allows loading the value from the value log.
 //!
 //! Recently retrieved ("hot") items may be cached by an in-memory value cache to avoid
