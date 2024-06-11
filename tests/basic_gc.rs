@@ -88,9 +88,7 @@ fn basic_gc() -> value_log::Result<()> {
         assert_eq!(item, key.repeat(1_000).into());
     }
 
-    let ids = value_log.manifest.list_segment_ids();
-
-    value_log.rollover(&ids, &index, MockIndexWriter(index.clone()))?;
+    value_log.major_compact(&index, MockIndexWriter(index.clone()))?;
     value_log.drop_stale_segments()?;
 
     {

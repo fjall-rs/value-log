@@ -33,7 +33,7 @@ impl Config {
     ///
     /// Default = none
     #[must_use]
-    pub fn compression(mut self, compression: CompressionType) -> Self {
+    pub fn use_compression(mut self, compression: CompressionType) -> Self {
         self.compression = compression;
         self
     }

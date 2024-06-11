@@ -1,10 +1,10 @@
 use crate::ValueHandle;
 
-/// External index trait
+/// Trait that allows reading from an internal index
 ///
 /// An index should point into the value log using [`ValueHandle`].
 #[allow(clippy::module_name_repetitions)]
-pub trait ExternalIndex {
+pub trait Reader {
     /// Returns a value handle for a given key.
     ///
     /// This method is used to index back into the index to check for

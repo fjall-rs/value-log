@@ -52,5 +52,5 @@ impl From<DeserializeError> for Error {
     }
 }
 
-/// Tree result
+/// Value log result
 pub type Result<T> = std::result::Result<T, Error>;

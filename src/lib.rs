@@ -36,7 +36,7 @@
 //! # Example usage
 //!
 //! ```
-//! # use value_log::{ExternalIndex, IndexWriter, MockIndex};
+//! # use value_log::{IndexReader, IndexWriter, MockIndex};
 //! use value_log::{Config, ValueHandle, ValueLog};
 //!
 //! # fn main() -> value_log::Result<()> {
@@ -110,13 +110,15 @@ pub use {
     config::Config,
     error::{Error, Result},
     handle::ValueHandle,
-    index::{ExternalIndex, Writer as IndexWriter},
-    segment::multi_writer::MultiWriter as SegmentWriter,
-    segment::reader::Reader as SegmentReader,
-    segment::Segment,
+    index::{Reader as IndexReader, Writer as IndexWriter},
     value::UserValue,
     value_log::ValueLog,
     version::Version,
+};
+
+#[doc(hidden)]
+pub use segment::{
+    multi_writer::MultiWriter as SegmentWriter, reader::Reader as SegmentReader, Segment,
 };
 
 #[doc(hidden)]

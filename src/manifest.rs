@@ -268,6 +268,7 @@ impl SegmentManifest {
     }
 
     /// Lists all segment IDs
+    #[doc(hidden)]
     #[must_use]
     pub fn list_segment_ids(&self) -> Vec<SegmentId> {
         self.segments
@@ -276,12 +277,6 @@ impl SegmentManifest {
             .keys()
             .copied()
             .collect()
-    }
-
-    /// Counts segments
-    #[must_use]
-    pub fn len(&self) -> usize {
-        self.segments.read().expect("lock is poisoned").len()
     }
 
     /// Lists all segments
@@ -293,6 +288,12 @@ impl SegmentManifest {
             .values()
             .cloned()
             .collect()
+    }
+
+    /// Counts segments
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.segments.read().expect("lock is poisoned").len()
     }
 
     /// Returns the amount of bytes on disk that are occupied by blobs.

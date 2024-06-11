@@ -7,7 +7,7 @@ use crate::{
     segment::merge::MergeReader,
     value::UserValue,
     version::Version,
-    Config, ExternalIndex, SegmentWriter, ValueHandle,
+    Config, IndexReader, SegmentWriter, ValueHandle,
 };
 use byteorder::{BigEndian, ReadBytesExt};
 use std::{
@@ -42,20 +42,27 @@ impl std::ops::Deref for ValueLog {
 
 #[allow(clippy::module_name_repetitions)]
 pub struct ValueLogInner {
+    /// Unique value log ID
     id: u64,
 
-    config: Config,
-
+    /// Base folder
     path: PathBuf,
+
+    /// Value log configuration
+    config: Config,
 
     /// In-memory blob cache
     blob_cache: Arc<BlobCache>,
 
     /// Segment manifest
+    #[doc(hidden)]
     pub manifest: SegmentManifest,
 
+    /// Generator to get next segment ID
     id_generator: IdGenerator,
 
+    /// Guards the rollover (compaction) process to only
+    /// allow one to happen at a time
     rollover_guard: Mutex<()>,
 }
 
@@ -237,7 +244,7 @@ impl ValueLog {
     }
 
     /// Tries to find a least-effort-selection of segments to
-    /// merge to react a certain space amplification.
+    /// merge to reach a certain space amplification.
     #[must_use]
     pub fn select_segments_for_space_amp_reduction(&self, space_amp_target: f32) -> Vec<SegmentId> {
         let current_space_amp = self.manifest.space_amp();
@@ -251,6 +258,7 @@ impl ValueLog {
             let lock = self.manifest.segments.read().expect("lock is poisoned");
             let mut segments = lock.values().collect::<Vec<_>>();
 
+            // Sort by stale ratio descending
             segments.sort_by(|a, b| {
                 b.stale_ratio()
                     .partial_cmp(&a.stale_ratio())
@@ -450,13 +458,23 @@ impl ValueLog {
         Ok(MergeReader::new(readers))
     }
 
+    #[doc(hidden)]
+    pub fn major_compact<R: IndexReader, W: IndexWriter>(
+        &self,
+        index_reader: &R,
+        index_writer: W,
+    ) -> crate::Result<()> {
+        let ids = self.manifest.list_segment_ids();
+        self.rollover(&ids, index_reader, index_writer)
+    }
+
     /// Rewrites some segments into new segment(s), blocking the caller
     /// until the operation is completely done.
     ///
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    pub fn rollover<R: ExternalIndex, W: IndexWriter>(
+    pub fn rollover<R: IndexReader, W: IndexWriter>(
         &self,
         ids: &[u64],
         index_reader: &R,

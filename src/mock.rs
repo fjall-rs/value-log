@@ -1,4 +1,4 @@
-use crate::{ExternalIndex, IndexWriter, ValueHandle};
+use crate::{IndexReader, IndexWriter, ValueHandle};
 use std::{
     collections::BTreeMap,
     sync::{Arc, RwLock},
@@ -35,7 +35,7 @@ impl MockIndex {
     }
 }
 
-impl ExternalIndex for MockIndex {
+impl IndexReader for MockIndex {
     fn get(&self, key: &[u8]) -> std::io::Result<Option<ValueHandle>> {
         Ok(self
             .read()

@@ -2,7 +2,7 @@ use std::{
     collections::BTreeMap,
     sync::{Arc, RwLock},
 };
-use value_log::{Config, ExternalIndex, IndexWriter, ValueHandle, ValueLog};
+use value_log::{Config, IndexReader, IndexWriter, ValueHandle, ValueLog};
 
 type DebugIndexInner = RwLock<BTreeMap<Arc<[u8]>, (ValueHandle, u32)>>;
 
@@ -27,7 +27,7 @@ impl DebugIndex {
     }
 }
 
-impl ExternalIndex for DebugIndex {
+impl IndexReader for DebugIndex {
     fn get(&self, key: &[u8]) -> std::io::Result<Option<ValueHandle>> {
         Ok(self
             .read()
