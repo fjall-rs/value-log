@@ -1,6 +1,6 @@
 use crate::ValueHandle;
 
-/// Trait that allows reading from an internal index
+/// Trait that allows reading from an external index
 ///
 /// An index should point into the value log using [`ValueHandle`].
 #[allow(clippy::module_name_repetitions)]
