@@ -20,8 +20,6 @@ path = "src/lib.rs"
 
 [features]
 default = []
-lz4 = ["dep:lz4_flex"]
-miniz = ["dep:miniz_oxide"]
 serde = ["dep:serde"]
 
 [dependencies]
