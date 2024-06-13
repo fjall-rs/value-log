@@ -1,7 +1,6 @@
 use crate::{
     key_range::KeyRange,
     serde::{Deserializable, DeserializeError, Serializable, SerializeError},
-    CompressionType,
 };
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::io::{Read, Write};
@@ -20,9 +19,6 @@ pub struct Metadata {
     /// true size in bytes (if no compression were used)
     pub total_uncompressed_bytes: u64,
 
-    /// What type of compression is used
-    pub compression: CompressionType,
-
     /// Key range
     pub key_range: KeyRange,
 }
@@ -35,8 +31,6 @@ impl Serializable for Metadata {
         writer.write_u64::<BigEndian>(self.item_count)?;
         writer.write_u64::<BigEndian>(self.compressed_bytes)?;
         writer.write_u64::<BigEndian>(self.total_uncompressed_bytes)?;
-
-        self.compression.serialize(writer)?;
 
         self.key_range.serialize(writer)?;
 
@@ -58,15 +52,12 @@ impl Deserializable for Metadata {
         let compressed_bytes = reader.read_u64::<BigEndian>()?;
         let total_uncompressed_bytes = reader.read_u64::<BigEndian>()?;
 
-        let compression = CompressionType::deserialize(reader)?;
-
         let key_range = KeyRange::deserialize(reader)?;
 
         Ok(Self {
             item_count,
             compressed_bytes,
             total_uncompressed_bytes,
-            compression,
             key_range,
         })
     }

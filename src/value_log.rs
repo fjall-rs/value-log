@@ -207,7 +207,7 @@ impl ValueLog {
         let mut value = vec![0; val_len as usize];
         reader.read_exact(&mut value)?;
 
-        let value = match segment.meta.compression {
+        /* let value = match segment.meta.compression {
             crate::CompressionType::None => value,
 
             #[cfg(feature = "lz4")]
@@ -217,7 +217,7 @@ impl ValueLog {
             #[cfg(feature = "miniz")]
             crate::CompressionType::Miniz(_) => miniz_oxide::inflate::decompress_to_vec(&value)
                 .map_err(|_| crate::Error::Decompress(segment.meta.compression))?,
-        };
+        }; */
 
         // TODO: handle CRC
 
@@ -240,8 +240,8 @@ impl ValueLog {
             self.config.segment_size_bytes,
             self.path.join(SEGMENTS_FOLDER),
             index_writer,
-            self.config.compression,
-        )?)
+        )?
+        .use_compression(self.config.compression.clone()))
     }
 
     /// Tries to find a least-effort-selection of segments to

@@ -1,7 +1,7 @@
 use crate::{
+    compression::{CompressError, DecompressError},
     serde::{DeserializeError, SerializeError},
     version::Version,
-    CompressionType,
 };
 
 /// Represents errors that can occur in the value-log
@@ -19,8 +19,11 @@ pub enum Error {
     /// Deserialization failed
     Deserialize(DeserializeError),
 
+    /// Compression failed
+    Compress(CompressError),
+
     /// Decompression failed
-    Decompress(CompressionType),
+    Decompress(DecompressError),
     // TODO:
     // /// CRC check failed
     // CrcMismatch,
@@ -49,6 +52,18 @@ impl From<SerializeError> for Error {
 impl From<DeserializeError> for Error {
     fn from(value: DeserializeError) -> Self {
         Self::Deserialize(value)
+    }
+}
+
+impl From<CompressError> for Error {
+    fn from(value: CompressError) -> Self {
+        Self::Compress(value)
+    }
+}
+
+impl From<DecompressError> for Error {
+    fn from(value: DecompressError) -> Self {
+        Self::Decompress(value)
     }
 }
 

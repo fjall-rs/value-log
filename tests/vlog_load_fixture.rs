@@ -11,3 +11,5 @@ fn vlog_load_v1() -> value_log::Result<()> {
 
     Ok(())
 }
+
+// TODO: corrupt

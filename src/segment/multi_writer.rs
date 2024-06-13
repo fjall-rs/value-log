@@ -1,9 +1,13 @@
 use super::writer::Writer;
 use crate::{
+    compression::Compressor,
     id::{IdGenerator, SegmentId},
-    CompressionType, IndexWriter, ValueHandle,
+    IndexWriter, ValueHandle,
 };
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 /// Segment writer, may write multiple segments
 pub struct MultiWriter<W: IndexWriter> {
@@ -15,7 +19,7 @@ pub struct MultiWriter<W: IndexWriter> {
 
     id_generator: IdGenerator,
 
-    compression: CompressionType,
+    compression: Option<Arc<dyn Compressor>>,
 
     blob_separation_size: usize,
 }
@@ -32,7 +36,6 @@ impl<W: IndexWriter> MultiWriter<W> {
         target_size: u64,
         folder: P,
         index_writer: W,
-        compression: CompressionType,
     ) -> std::io::Result<Self> {
         let folder = folder.as_ref();
 
@@ -44,17 +47,26 @@ impl<W: IndexWriter> MultiWriter<W> {
             folder: folder.into(),
             target_size,
 
-            writers: vec![Writer::new(segment_path, segment_id, compression)?],
+            writers: vec![Writer::new(segment_path, segment_id)?],
             index_writer,
 
-            compression,
+            compression: None,
             blob_separation_size: 2_048,
         })
     }
 
     /// Sets the separation threshold for blobs
+    #[must_use]
     pub fn blob_separation_size(mut self, bytes: usize) -> Self {
         self.blob_separation_size = bytes;
+        self
+    }
+
+    /// Sets the compression method
+    #[must_use]
+    pub fn use_compression(mut self, compressor: Arc<dyn Compressor>) -> Self {
+        self.compression = Some(compressor.clone());
+        self.get_active_writer_mut().compression = Some(compressor);
         self
     }
 
@@ -90,8 +102,13 @@ impl<W: IndexWriter> MultiWriter<W> {
         let new_segment_id = self.id_generator.next();
         let segment_path = self.folder.join(new_segment_id.to_string());
 
-        self.writers
-            .push(Writer::new(segment_path, new_segment_id, self.compression)?);
+        let mut new_writer = Writer::new(segment_path, new_segment_id)?;
+
+        if let Some(compressor) = &self.compression {
+            new_writer = new_writer.use_compression(compressor.clone());
+        }
+
+        self.writers.push(new_writer);
 
         Ok(())
     }

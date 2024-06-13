@@ -1,12 +1,14 @@
 use super::{meta::Metadata, trailer::SegmentFileTrailer};
 use crate::{
-    id::SegmentId, key_range::KeyRange, serde::Serializable, value::UserKey, CompressionType,
+    compression::Compressor, id::SegmentId, key_range::KeyRange, serde::Serializable,
+    value::UserKey,
 };
 use byteorder::{BigEndian, WriteBytesExt};
 use std::{
     fs::File,
     io::{BufWriter, Seek, Write},
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 /// Segment writer
@@ -14,7 +16,8 @@ pub struct Writer {
     pub(crate) path: PathBuf,
     pub(crate) segment_id: SegmentId,
 
-    writer: BufWriter<File>,
+    #[allow(clippy::struct_field_names)]
+    active_writer: BufWriter<File>,
 
     offset: u64,
 
@@ -25,7 +28,7 @@ pub struct Writer {
     pub(crate) first_key: Option<UserKey>,
     pub(crate) last_key: Option<UserKey>,
 
-    pub(crate) compression: CompressionType,
+    pub(crate) compression: Option<Arc<dyn Compressor>>,
 }
 
 impl Writer {
@@ -35,11 +38,7 @@ impl Writer {
     ///
     /// Will return `Err` if an IO error occurs.
     #[doc(hidden)]
-    pub fn new<P: AsRef<Path>>(
-        path: P,
-        segment_id: SegmentId,
-        compression: CompressionType,
-    ) -> std::io::Result<Self> {
+    pub fn new<P: AsRef<Path>>(path: P, segment_id: SegmentId) -> std::io::Result<Self> {
         let path = path.as_ref();
 
         let file = File::create(path)?;
@@ -47,7 +46,7 @@ impl Writer {
         Ok(Self {
             path: path.into(),
             segment_id,
-            writer: BufWriter::new(file),
+            active_writer: BufWriter::new(file),
             offset: 0,
             item_count: 0,
             written_blob_bytes: 0,
@@ -56,8 +55,13 @@ impl Writer {
             first_key: None,
             last_key: None,
 
-            compression,
+            compression: None,
         })
+    }
+
+    pub fn use_compression(mut self, compressor: Arc<dyn Compressor>) -> Self {
+        self.compression = Some(compressor);
+        self
     }
 
     /// Returns the current offset in the file.
@@ -83,7 +87,7 @@ impl Writer {
     /// # Panics
     ///
     /// Panics if the key length is empty or greater than 2^16, or the value length is greater than 2^32.
-    pub fn write(&mut self, key: &[u8], value: &[u8]) -> std::io::Result<u32> {
+    pub fn write(&mut self, key: &[u8], value: &[u8]) -> crate::Result<u32> {
         assert!(!key.is_empty());
         assert!(key.len() <= u16::MAX.into());
         assert!(u32::try_from(value.len()).is_ok());
@@ -95,45 +99,47 @@ impl Writer {
 
         self.uncompressed_bytes += value.len() as u64;
 
-        let value = match self.compression {
-            CompressionType::None => value.to_vec(),
-
-            #[cfg(feature = "lz4")]
-            CompressionType::Lz4 => lz4_flex::compress_prepend_size(&value),
-
-            #[cfg(feature = "miniz")]
-            CompressionType::Miniz(level) => miniz_oxide::deflate::compress_to_vec(&value, level),
+        let value = match &self.compression {
+            Some(compressor) => compressor.compress(value)?,
+            None => value.to_vec(),
         };
 
+        // Write CRC
         let mut hasher = crc32fast::Hasher::new();
         hasher.update(&value);
         let crc = hasher.finalize();
 
-        // NOTE: Truncation is okay and actually needed
-        #[allow(clippy::cast_possible_truncation)]
-        self.writer.write_u16::<BigEndian>(key.len() as u16)?;
-        self.writer.write_all(key)?;
-
-        self.writer.write_u32::<BigEndian>(crc)?;
+        // Write key
 
         // NOTE: Truncation is okay and actually needed
         #[allow(clippy::cast_possible_truncation)]
-        self.writer.write_u32::<BigEndian>(value.len() as u32)?;
-        self.writer.write_all(&value)?;
+        self.active_writer
+            .write_u16::<BigEndian>(key.len() as u16)?;
+        self.active_writer.write_all(key)?;
 
-        self.written_blob_bytes += value.len() as u64;
+        self.active_writer.write_u32::<BigEndian>(crc)?;
+
+        // Write value
+
+        // NOTE: Truncation is okay and actually needed
+        #[allow(clippy::cast_possible_truncation)]
+        self.active_writer
+            .write_u32::<BigEndian>(value.len() as u32)?;
+        self.active_writer.write_all(&value)?;
+
+        // CRC
+        self.offset += std::mem::size_of::<u32>() as u64;
 
         // Key
         self.offset += std::mem::size_of::<u16>() as u64;
         self.offset += key.len() as u64;
 
-        // CRC
-        self.offset += std::mem::size_of::<u32>() as u64;
-
         // Value
         self.offset += std::mem::size_of::<u32>() as u64;
         self.offset += value.len() as u64;
 
+        // Update metadata
+        self.written_blob_bytes += value.len() as u64;
         self.item_count += 1;
 
         // NOTE: Truncation is okay
@@ -142,7 +148,7 @@ impl Writer {
     }
 
     pub(crate) fn flush(&mut self) -> crate::Result<()> {
-        let metadata_ptr = self.writer.stream_position()?;
+        let metadata_ptr = self.active_writer.stream_position()?;
 
         // Write metadata
         let metadata = Metadata {
@@ -157,18 +163,17 @@ impl Writer {
                     .clone()
                     .expect("should have written at least 1 item"),
             )),
-            compression: self.compression,
         };
-        metadata.serialize(&mut self.writer)?;
+        metadata.serialize(&mut self.active_writer)?;
 
         SegmentFileTrailer {
             metadata,
             metadata_ptr,
         }
-        .serialize(&mut self.writer)?;
+        .serialize(&mut self.active_writer)?;
 
-        self.writer.flush()?;
-        self.writer.get_mut().sync_all()?;
+        self.active_writer.flush()?;
+        self.active_writer.get_mut().sync_all()?;
 
         Ok(())
     }

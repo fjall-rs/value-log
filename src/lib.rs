@@ -97,7 +97,7 @@ mod version;
 
 pub use {
     blob_cache::BlobCache,
-    compression::CompressionType,
+    compression::{CompressError, Compressor, DecompressError},
     config::Config,
     error::{Error, Result},
     handle::ValueHandle,
@@ -107,6 +107,9 @@ pub use {
     value_log::ValueLog,
     version::Version,
 };
+
+#[doc(hidden)]
+pub use config::NoCompressor;
 
 #[doc(hidden)]
 pub use segment::{reader::Reader as SegmentReader, Segment};

@@ -1,8 +1,20 @@
-use crate::{blob_cache::BlobCache, CompressionType};
+use crate::{blob_cache::BlobCache, compression::Compressor};
 use std::sync::Arc;
 
+/// No compression
+pub struct NoCompressor;
+
+impl Compressor for NoCompressor {
+    fn compress(&self, bytes: &[u8]) -> Result<Vec<u8>, crate::compression::CompressError> {
+        Ok(bytes.into())
+    }
+
+    fn decompress(&self, bytes: &[u8]) -> Result<Vec<u8>, crate::compression::DecompressError> {
+        Ok(bytes.into())
+    }
+}
+
 /// Value log configuration
-#[derive(Debug)]
 pub struct Config {
     /// Target size of vLog segments
     pub(crate) segment_size_bytes: u64,
@@ -11,7 +23,7 @@ pub struct Config {
     pub(crate) blob_cache: Arc<BlobCache>,
 
     /// Compression to use
-    pub(crate) compression: CompressionType,
+    pub(crate) compression: Arc<dyn Compressor + Send + Sync>,
 }
 
 impl Default for Config {
@@ -19,9 +31,7 @@ impl Default for Config {
         Self {
             segment_size_bytes: 256 * 1_024 * 1_024,
             blob_cache: Arc::new(BlobCache::with_capacity_bytes(16 * 1_024 * 1_024)),
-
-            // TODO: setter method
-            compression: CompressionType::None,
+            compression: Arc::new(NoCompressor),
         }
     }
 }
@@ -29,12 +39,12 @@ impl Default for Config {
 impl Config {
     /// Sets the compression type to use.
     ///
-    /// Using compression is recommended, see [`CompressionType`].
+    /// Using compression is recommended.
     ///
     /// Default = none
     #[must_use]
-    pub fn use_compression(mut self, compression: CompressionType) -> Self {
-        self.compression = compression;
+    pub fn use_compression(mut self, compressor: Arc<dyn Compressor + Send + Sync>) -> Self {
+        self.compression = compressor;
         self
     }
 
