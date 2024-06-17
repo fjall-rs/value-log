@@ -2,7 +2,7 @@ use super::writer::Writer;
 use crate::{
     compression::Compressor,
     id::{IdGenerator, SegmentId},
-    IndexWriter, ValueHandle,
+    ValueHandle,
 };
 use std::{
     path::{Path, PathBuf},
@@ -10,21 +10,18 @@ use std::{
 };
 
 /// Segment writer, may write multiple segments
-pub struct MultiWriter<W: IndexWriter> {
+pub struct MultiWriter {
     folder: PathBuf,
     target_size: u64,
 
     writers: Vec<Writer>,
-    pub(crate) index_writer: W, // TODO: only need a (mutable) reference??
 
     id_generator: IdGenerator,
 
     compression: Option<Arc<dyn Compressor>>,
-
-    blob_separation_size: usize,
 }
 
-impl<W: IndexWriter> MultiWriter<W> {
+impl MultiWriter {
     /// Initializes a new segment writer.
     ///
     /// # Errors
@@ -35,7 +32,6 @@ impl<W: IndexWriter> MultiWriter<W> {
         id_generator: IdGenerator,
         target_size: u64,
         folder: P,
-        index_writer: W,
     ) -> std::io::Result<Self> {
         let folder = folder.as_ref();
 
@@ -48,18 +44,9 @@ impl<W: IndexWriter> MultiWriter<W> {
             target_size,
 
             writers: vec![Writer::new(segment_path, segment_id)?],
-            index_writer,
 
             compression: None,
-            blob_separation_size: 2_048,
         })
-    }
-
-    /// Sets the separation threshold for blobs
-    #[must_use]
-    pub fn blob_separation_size(mut self, bytes: usize) -> Self {
-        self.blob_separation_size = bytes;
-        self
     }
 
     /// Sets the compression method
@@ -70,7 +57,8 @@ impl<W: IndexWriter> MultiWriter<W> {
         self
     }
 
-    fn get_active_writer(&self) -> &Writer {
+    #[doc(hidden)]
+    pub fn get_active_writer(&self) -> &Writer {
         self.writers.last().expect("should exist")
     }
 
@@ -78,20 +66,26 @@ impl<W: IndexWriter> MultiWriter<W> {
         self.writers.last_mut().expect("should exist")
     }
 
-    /// Returns the current offset in the file.
+    /// Returns the [`ValueHandle`] for the next written blob.
     ///
     /// This can be used to index an item into an external `Index`.
+    pub fn get_next_value_handle(&self, key: &[u8]) -> ValueHandle {
+        ValueHandle {
+            offset: self.offset(key),
+            segment_id: self.segment_id(),
+        }
+    }
+
     #[must_use]
-    pub(crate) fn offset(&self, key: &[u8]) -> u64 {
+    fn offset(&self, key: &[u8]) -> u64 {
         self.get_active_writer().offset()
         // NOTE: Point to the value record, not the key
         // The key is not really needed when dereferencing a value handle
         + std::mem::size_of::<u16>() as u64 + key.len() as u64
     }
 
-    /// Returns the segment ID
     #[must_use]
-    pub(crate) fn segment_id(&self) -> SegmentId {
+    fn segment_id(&self) -> SegmentId {
         self.get_active_writer().segment_id()
     }
 
@@ -128,33 +122,9 @@ impl<W: IndexWriter> MultiWriter<W> {
 
         let target_size = self.target_size;
 
-        // Give value handle to index writer
-        let bytes_written = if value.len() >= self.blob_separation_size {
-            let segment_id = self.segment_id();
-            let offset = self.offset(key);
-            let vhandle = ValueHandle { segment_id, offset };
-
-            log::trace!(
-                "inserting indirection: {vhandle:?} => {:?}",
-                String::from_utf8_lossy(key)
-            );
-
-            self.index_writer
-                .insert_indirect(key, vhandle, value.len() as u32)?;
-
-            // Write actual value into segment
-            let writer = self.get_active_writer_mut();
-
-            writer.write(key, value)?
-        } else {
-            log::trace!("GC: inserting direct: {:?}", String::from_utf8_lossy(key));
-            self.index_writer.insert_direct(key, value)?;
-
-            0
-        };
-
         // Write actual value into segment
         let writer = self.get_active_writer_mut();
+        let bytes_written = writer.write(key, value)?;
 
         // Check for segment size target, maybe rotate to next writer
         if writer.offset() >= target_size {
@@ -165,7 +135,7 @@ impl<W: IndexWriter> MultiWriter<W> {
         Ok(bytes_written)
     }
 
-    pub(crate) fn finish(mut self) -> crate::Result<(Vec<Writer>, W)> {
+    pub(crate) fn finish(mut self) -> crate::Result<Vec<Writer>> {
         let writer = self.get_active_writer_mut();
 
         if writer.item_count > 0 {
@@ -175,6 +145,6 @@ impl<W: IndexWriter> MultiWriter<W> {
         // IMPORTANT: We cannot finish the index writer here
         // The writers first need to be registered into the value log
 
-        Ok((self.writers, self.index_writer))
+        Ok(self.writers)
     }
 }

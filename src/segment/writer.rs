@@ -13,7 +13,7 @@ use std::{
 
 /// Segment writer
 pub struct Writer {
-    pub(crate) path: PathBuf,
+    pub path: PathBuf,
     pub(crate) segment_id: SegmentId,
 
     #[allow(clippy::struct_field_names)]
@@ -68,13 +68,13 @@ impl Writer {
     ///
     /// This can be used to index an item into an external `Index`.
     #[must_use]
-    pub fn offset(&self) -> u64 {
+    pub(crate) fn offset(&self) -> u64 {
         self.offset
     }
 
     /// Returns the segment ID
     #[must_use]
-    pub fn segment_id(&self) -> SegmentId {
+    pub(crate) fn segment_id(&self) -> SegmentId {
         self.segment_id
     }
 

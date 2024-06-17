@@ -46,7 +46,7 @@ pub struct ValueLogInner {
     id: u64,
 
     /// Base folder
-    path: PathBuf,
+    pub path: PathBuf,
 
     /// Value log configuration
     config: Config,
@@ -173,8 +173,9 @@ impl ValueLog {
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    pub fn register_writer<W: IndexWriter>(&self, writer: SegmentWriter<W>) -> crate::Result<W> {
-        self.manifest.register(writer)
+    pub fn register_writer(&self, writer: SegmentWriter) -> crate::Result<()> {
+        self.manifest.register(writer)?;
+        Ok(())
     }
 
     /// Returns segment count
@@ -207,17 +208,7 @@ impl ValueLog {
         let mut value = vec![0; val_len as usize];
         reader.read_exact(&mut value)?;
 
-        /* let value = match segment.meta.compression {
-            crate::CompressionType::None => value,
-
-            #[cfg(feature = "lz4")]
-            crate::CompressionType::Lz4 => lz4_flex::decompress_size_prepended(&value)
-                .map_err(|_| crate::Error::Decompress(segment.meta.compression))?,
-
-            #[cfg(feature = "miniz")]
-            crate::CompressionType::Miniz(_) => miniz_oxide::inflate::decompress_to_vec(&value)
-                .map_err(|_| crate::Error::Decompress(segment.meta.compression))?,
-        }; */
+        let value = self.config.compression.decompress(&value)?;
 
         // TODO: handle CRC
 
@@ -234,12 +225,11 @@ impl ValueLog {
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    pub fn get_writer<W: IndexWriter>(&self, index_writer: W) -> crate::Result<SegmentWriter<W>> {
+    pub fn get_writer(&self) -> crate::Result<SegmentWriter> {
         Ok(SegmentWriter::new(
             self.id_generator.clone(),
             self.config.segment_size_bytes,
             self.path.join(SEGMENTS_FOLDER),
-            index_writer,
         )?
         .use_compression(self.config.compression.clone()))
     }
@@ -314,6 +304,9 @@ impl ValueLog {
     ///
     /// Will return `Err` if an IO error occurs.
     pub fn drop_stale_segments(&self) -> crate::Result<()> {
+        // IMPORTANT: Only allow 1 rollover or GC at any given time
+        let _guard = self.rollover_guard.lock().expect("lock is poisoned");
+
         let ids = self
             .manifest
             .segments
@@ -324,7 +317,7 @@ impl ValueLog {
             .map(|x| x.id)
             .collect::<Vec<_>>();
 
-        log::debug!("Dropping blob files: {ids:?}");
+        log::info!("Dropping stale blob files: {ids:?}");
         self.manifest.drop_segments(&ids)?;
 
         Ok(())
@@ -366,6 +359,7 @@ impl ValueLog {
         &self,
         iter: impl Iterator<Item = std::io::Result<(ValueHandle, u32)>>,
     ) -> crate::Result<()> {
+        #[derive(Debug)]
         struct SegmentCounter {
             size: u64,
             item_count: u64,
@@ -398,6 +392,8 @@ impl ValueLog {
                     item_count: 1,
                 });
         }
+
+        eprintln!("{size_map:?}");
 
         for (&id, counter) in &size_map {
             let used_size = counter.size;
@@ -487,7 +483,7 @@ impl ValueLog {
         &self,
         ids: &[u64],
         index_reader: &R,
-        index_writer: W,
+        mut index_writer: W,
     ) -> crate::Result<()> {
         if ids.is_empty() {
             return Ok(());
@@ -514,8 +510,9 @@ impl ValueLog {
 
         let reader = MergeReader::new(readers);
 
-        // IMPORTANT: Set separation size to 0 just in case
-        let mut writer = self.get_writer(index_writer)?.blob_separation_size(0);
+        let mut writer = self
+            .get_writer()?
+            .use_compression(self.config.compression.clone());
 
         for item in reader {
             let (k, v, segment_id) = item?;
@@ -527,12 +524,19 @@ impl ValueLog {
                 _ => {}
             }
 
+            let vhandle = writer.get_next_value_handle(&k);
+            index_writer.insert_indirect(&k, vhandle, v.len() as u32)?;
+
             writer.write(&k, &v)?;
         }
 
         // IMPORTANT: New segments need to be persisted before adding to index
         // to avoid dangling pointers
         self.manifest.register(writer)?;
+
+        // NOTE: If we crash here, it's fine, the segments are registered
+        // but never referenced, so they can just be dropped after recovery
+        index_writer.finish()?;
 
         // IMPORTANT: We only mark the segments as definitely stale
         // The external index needs to decide when it is safe to drop

@@ -22,13 +22,6 @@ pub trait Reader {
 /// no written value handles should be handed out by the index.
 /// When `finish` fails, no value handles should be written into the index.
 pub trait Writer {
-    /// Inserts a value directly into the index write batch.
-    ///
-    /// # Errors
-    ///
-    /// Will return `Err` if an IO error occurs.
-    fn insert_direct(&mut self, key: &[u8], value: &[u8]) -> std::io::Result<()>;
-
     /// Inserts a value handle into the index write batch.
     ///
     /// # Errors
