@@ -393,8 +393,6 @@ impl ValueLog {
                 });
         }
 
-        eprintln!("{size_map:?}");
-
         for (&id, counter) in &size_map {
             let used_size = counter.size;
             let alive_item_count = counter.item_count;

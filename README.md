@@ -9,6 +9,7 @@
 [![docs.rs](https://img.shields.io/docsrs/value-log?color=green)](https://docs.rs/value-log)
 [![Crates.io](https://img.shields.io/crates/v/value-log?color=blue)](https://crates.io/crates/value-log)
 ![MSRV](https://img.shields.io/badge/MSRV-1.74.0-blue)
+[![dependency status](https://deps.rs/repo/github/fjall-rs/value-log/status.svg)](https://deps.rs/repo/github/fjall-rs/value-log)
 
 Generic value log implementation for key-value separated storage, inspired by RocksDB's BlobDB [[1]](#footnotes) and implemented in safe, stable Rust.
 
