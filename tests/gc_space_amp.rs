@@ -1,5 +1,5 @@
 use test_log::test;
-use value_log::{Config, MockIndex, MockIndexWriter, ValueLog};
+use value_log::{Config, IndexWriter, MockIndex, MockIndexWriter, ValueLog};
 
 #[test]
 fn gc_space_amp_target_1() -> value_log::Result<()> {
@@ -13,22 +13,30 @@ fn gc_space_amp_target_1() -> value_log::Result<()> {
     assert_eq!(0.0, value_log.space_amp());
     assert_eq!(0.0, value_log.manifest.stale_ratio());
 
-    let key = "key";
+    let key = b"key";
     let value = "value".repeat(20_000);
 
     // NOTE: Write a single item 10x
     // -> should result in space amp = 10.0x
     for x in 1..=10 {
-        let index_writer = MockIndexWriter(index.clone());
-        let mut writer = value_log.get_writer(index_writer)?;
+        let mut index_writer = MockIndexWriter(index.clone());
+        let mut writer = value_log.get_writer()?;
 
-        writer.write(key.as_bytes(), value.as_bytes())?;
+        let handle = writer.get_next_value_handle(key);
+        index_writer.insert_indirect(key, handle, value.len() as u32)?;
+
+        writer.write(key, value.as_bytes())?;
 
         {
             let key = format!("key{x}");
             let value = "value".repeat(5_000);
 
-            writer.write(key.as_bytes(), value.as_bytes())?;
+            let key = key.as_bytes();
+
+            let handle = writer.get_next_value_handle(key);
+            index_writer.insert_indirect(key, handle, value.len() as u32)?;
+
+            writer.write(key, value.as_bytes())?;
         }
 
         value_log.register_writer(writer)?;

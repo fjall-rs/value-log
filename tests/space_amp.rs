@@ -1,5 +1,5 @@
 use test_log::test;
-use value_log::{Config, MockIndex, MockIndexWriter, ValueLog};
+use value_log::{Config, IndexWriter, MockIndex, MockIndexWriter, ValueLog};
 
 #[test]
 fn worst_case_space_amp() -> value_log::Result<()> {
@@ -13,16 +13,19 @@ fn worst_case_space_amp() -> value_log::Result<()> {
     assert_eq!(0.0, value_log.space_amp());
     assert_eq!(0.0, value_log.manifest.stale_ratio());
 
-    let key = "key";
+    let key = b"key";
     let value = "value".repeat(5_000);
 
     // NOTE: Write a single item 10x
     // -> should result in space amp = 10.0x
     for x in 1..=10 {
-        let index_writer = MockIndexWriter(index.clone());
-        let mut writer = value_log.get_writer(index_writer)?;
+        let mut index_writer = MockIndexWriter(index.clone());
+        let mut writer = value_log.get_writer()?;
 
-        writer.write(key.as_bytes(), value.as_bytes())?;
+        let handle = writer.get_next_value_handle(key);
+        index_writer.insert_indirect(key, handle, value.len() as u32)?;
+
+        writer.write(key, value.as_bytes())?;
 
         value_log.register_writer(writer)?;
 
@@ -55,8 +58,11 @@ fn no_overlap_space_amp() -> value_log::Result<()> {
         let key = i.to_string();
         let value = "afsasfdfasdfsda".repeat(5_000);
 
-        let index_writer = MockIndexWriter(index.clone());
-        let mut writer = value_log.get_writer(index_writer)?;
+        let mut index_writer = MockIndexWriter(index.clone());
+        let mut writer = value_log.get_writer()?;
+
+        let handle = writer.get_next_value_handle(key.as_bytes());
+        index_writer.insert_indirect(key.as_bytes(), handle, value.len() as u32)?;
 
         writer.write(key.as_bytes(), value.as_bytes())?;
         value_log.register_writer(writer)?;

@@ -48,14 +48,19 @@
 //! let value_log = ValueLog::open(path, Config::default())?;
 //!
 //! // Write some data
-//! # let index_writer = MockIndexWriter(index.clone());
-//! let mut writer = value_log.get_writer(index_writer)?;
+//! # let mut index_writer = MockIndexWriter(index.clone());
+//! let mut writer = value_log.get_writer()?;
 //!
 //! for key in ["a", "b", "c", "d", "e"] {
 //!     let value = key.repeat(10_000);
 //!     let value = value.as_bytes();
 //!
-//!     writer.write(key.as_bytes(), value)?;
+//!     let key = key.as_bytes();
+//!
+//!     let handle = writer.get_next_value_handle(key);
+//!     index_writer.insert_indirect(key, handle, value.len() as u32)?;
+//!
+//!     writer.write(key, value)?;
 //! }
 //!
 //! // Finish writing

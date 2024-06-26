@@ -58,17 +58,23 @@ impl MultiWriter {
     }
 
     #[doc(hidden)]
+    #[must_use]
     pub fn get_active_writer(&self) -> &Writer {
+        // NOTE: initialized in constructor
+        #[allow(clippy::expect_used)]
         self.writers.last().expect("should exist")
     }
 
     fn get_active_writer_mut(&mut self) -> &mut Writer {
+        // NOTE: initialized in constructor
+        #[allow(clippy::expect_used)]
         self.writers.last_mut().expect("should exist")
     }
 
     /// Returns the [`ValueHandle`] for the next written blob.
     ///
     /// This can be used to index an item into an external `Index`.
+    #[must_use]
     pub fn get_next_value_handle(&self, key: &[u8]) -> ValueHandle {
         ValueHandle {
             offset: self.offset(key),

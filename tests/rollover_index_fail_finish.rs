@@ -5,10 +5,6 @@ use value_log::{Config, IndexWriter, MockIndex, MockIndexWriter, ValueHandle, Va
 pub struct DebugIndexWriter;
 
 impl IndexWriter for DebugIndexWriter {
-    fn insert_direct(&mut self, _: &[u8], _: &[u8]) -> std::io::Result<()> {
-        Ok(())
-    }
-
     fn insert_indirect(&mut self, _: &[u8], _: ValueHandle, _: u32) -> std::io::Result<()> {
         Ok(())
     }
@@ -30,12 +26,15 @@ fn rollover_index_fail_finish() -> value_log::Result<()> {
     let items = ["a", "b", "c", "d", "e"];
 
     {
-        let index_writer = MockIndexWriter(index.clone());
-        let mut writer = value_log.get_writer(index_writer)?;
+        let mut index_writer = MockIndexWriter(index.clone());
+        let mut writer = value_log.get_writer()?;
 
         for key in &items {
             let value = key.repeat(10_000);
             let value = value.as_bytes();
+
+            let handle = writer.get_next_value_handle(key.as_bytes());
+            index_writer.insert_indirect(key.as_bytes(), handle, value.len() as u32)?;
 
             writer.write(key.as_bytes(), value)?;
         }
