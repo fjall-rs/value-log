@@ -22,11 +22,9 @@ impl From<(ValueLogId, ValueHandle)> for CacheKey {
 struct BlobWeighter;
 
 impl Weighter<CacheKey, Item> for BlobWeighter {
-    // NOTE: quick_cache only supports u32 as weight, but that's fine
-    // 4 GB blobs are too big anyway
     #[allow(clippy::cast_possible_truncation)]
-    fn weight(&self, _: &CacheKey, blob: &Item) -> u32 {
-        blob.len() as u32
+    fn weight(&self, _: &CacheKey, blob: &Item) -> u64 {
+        blob.len() as u64
     }
 }
 
