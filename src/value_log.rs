@@ -4,6 +4,7 @@ use crate::{
     index::Writer as IndexWriter,
     manifest::{SegmentManifest, SEGMENTS_FOLDER, VLOG_MARKER},
     path::absolute_path,
+    scanner::{Scanner, SizeMap},
     segment::merge::MergeReader,
     value::UserValue,
     version::Version,
@@ -11,7 +12,6 @@ use crate::{
 };
 use byteorder::{BigEndian, ReadBytesExt};
 use std::{
-    collections::BTreeMap,
     fs::File,
     io::{BufReader, Read, Seek},
     path::PathBuf,
@@ -63,7 +63,7 @@ pub struct ValueLogInner {
 
     /// Guards the rollover (compaction) process to only
     /// allow one to happen at a time
-    rollover_guard: Mutex<()>,
+    pub(crate) rollover_guard: Mutex<()>,
 }
 
 impl ValueLog {
@@ -174,6 +174,8 @@ impl ValueLog {
     ///
     /// Will return `Err` if an IO error occurs.
     pub fn register_writer(&self, writer: SegmentWriter) -> crate::Result<()> {
+        let _lock = self.rollover_guard.lock().expect("lock is poisoned");
+
         self.manifest.register(writer)?;
         Ok(())
     }
@@ -349,51 +351,9 @@ impl ValueLog {
         self.manifest.space_amp()
     }
 
-    /// Scans the given index and collecting GC statistics.
-    ///
-    /// # Errors
-    ///
-    /// Will return `Err` if an IO error occurs.
-    #[allow(clippy::result_unit_err)]
-    pub fn scan_for_stats(
-        &self,
-        iter: impl Iterator<Item = std::io::Result<(ValueHandle, u32)>>,
-    ) -> crate::Result<()> {
-        #[derive(Debug)]
-        struct SegmentCounter {
-            size: u64,
-            item_count: u64,
-        }
-
-        // IMPORTANT: Only allow 1 rollover or GC at any given time
-        let _guard = self.rollover_guard.lock().expect("lock is poisoned");
-
-        log::info!("--- GC report for vLog @ {:?} ---", self.path);
-
-        let mut size_map = BTreeMap::<SegmentId, SegmentCounter>::new();
-
-        for handle in iter {
-            let (handle, size) = handle.map_err(|_| {
-                crate::Error::Io(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "Index returned error",
-                ))
-            })?;
-            let size = u64::from(size);
-
-            size_map
-                .entry(handle.segment_id)
-                .and_modify(|x| {
-                    x.item_count += 1;
-                    x.size += size;
-                })
-                .or_insert_with(|| SegmentCounter {
-                    size,
-                    item_count: 1,
-                });
-        }
-
-        for (&id, counter) in &size_map {
+    #[doc(hidden)]
+    pub fn consume_scan_result(&self, segment_ids: &[u64], size_map: &SizeMap) {
+        for (&id, counter) in size_map {
             let used_size = counter.size;
             let alive_item_count = counter.item_count;
 
@@ -412,20 +372,14 @@ impl ValueLog {
                 "Blob file #{id} has {}/{} stale MiB ({:.1}% stale, {stale_items}/{total_items} items) - space amp: {space_amp})",
                 stale_bytes / 1_024 / 1_024,
                 total_bytes / 1_024 / 1_024,
-                stale_ratio * 100.0
+                stale_ratio * 100.0,
             );
 
             segment.gc_stats.set_stale_bytes(stale_bytes);
             segment.gc_stats.set_stale_items(stale_items);
         }
 
-        for id in self
-            .manifest
-            .segments
-            .read()
-            .expect("lock is poisoned")
-            .keys()
-        {
+        for id in segment_ids {
             let segment = self
                 .manifest
                 .get_segment(*id)
@@ -440,13 +394,36 @@ impl ValueLog {
                 self.mark_as_stale(&[*id]);
             }
         }
+    }
 
+    /// Scans the given index and collecting GC statistics.
+    ///
+    /// # Errors
+    ///
+    /// Will return `Err` if an IO error occurs.
+    #[allow(clippy::result_unit_err)]
+    pub fn scan_for_stats(
+        &self,
+        iter: impl Iterator<Item = std::io::Result<(ValueHandle, u32)>>,
+    ) -> crate::Result<()> {
+        let mut scanner = Scanner::new(self, iter);
+
+        let segment_ids = self.manifest.list_segment_ids();
+
+        scanner.scan()?;
+        let size_map = scanner.finish();
+        self.consume_scan_result(&segment_ids, &size_map);
+
+        Ok(())
+    }
+
+    /// Prints GC report.
+    pub fn print_gc_report(&self) {
+        log::info!("--- GC report for vLog @ {:?} ---", self.path);
         log::info!("Total bytes: {}", self.manifest.total_bytes());
         log::info!("Stale bytes: {}", self.manifest.stale_bytes());
         log::info!("Space amp: {}", self.space_amp());
         log::info!("--- GC report done ---");
-
-        Ok(())
     }
 
     #[doc(hidden)]

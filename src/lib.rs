@@ -94,6 +94,10 @@ mod key_range;
 mod manifest;
 mod mock;
 mod path;
+
+#[doc(hidden)]
+pub mod scanner;
+
 mod segment;
 mod serde;
 mod value;

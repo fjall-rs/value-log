@@ -2,14 +2,14 @@
 name = "value-log"
 description = "Value log implementation for key-value separated LSM storage"
 license = "MIT OR Apache-2.0"
-version = "1.0.0-pre.2"
+version = "1.0.0-pre.3"
 edition = "2021"
 rust-version = "1.74.0"
 readme = "README.md"
 include = ["src/**/*", "LICENSE-APACHE", "LICENSE-MIT", "README.md"]
 repository = "https://github.com/fjall-rs/value-log"
 homepage = "https://github.com/fjall-rs/value-log"
-keywords = ["database", "lsmt", "lsm", "wisckey", "key-value"]
+keywords = ["database", "blobdb", "lsm", "wisckey", "key-value"]
 categories = ["data-structures", "database-implementations", "algorithms"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
