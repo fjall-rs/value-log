@@ -26,8 +26,6 @@ impl SegmentFileTrailer {
         // Get metadata ptr
         let metadata_ptr = reader.read_u64::<BigEndian>()?;
 
-        eprintln!("load metadata @ {metadata_ptr}");
-
         // IMPORTANT: Subtract sizeof(meta_ptr) ------v
         let remaining_padding = TRAILER_SIZE - std::mem::size_of::<u64>() - TRAILER_MAGIC.len();
         reader.seek_relative(remaining_padding as i64)?;

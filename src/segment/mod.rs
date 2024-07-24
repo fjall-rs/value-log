@@ -34,8 +34,8 @@ impl Segment {
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    pub fn scan(&self) -> std::io::Result<reader::Reader> {
-        reader::Reader::new(&self.path, self.id, self.meta.item_count)
+    pub fn scan(&self) -> crate::Result<reader::Reader> {
+        reader::Reader::new(&self.path, self.id)
     }
 
     /// Always returns `false` because a segment is never empty.

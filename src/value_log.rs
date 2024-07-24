@@ -85,6 +85,13 @@ impl ValueLog {
         }
     }
 
+    #[doc(hidden)]
+    pub fn verify(&self) -> crate::Result<usize> {
+        let _lock = self.rollover_guard.lock().expect("lock is poisoned");
+
+        Ok(0)
+    }
+
     /// Creates a new empty value log in a directory.
     pub(crate) fn create_new<P: Into<PathBuf>>(path: P, config: Config) -> crate::Result<Self> {
         let path = absolute_path(path.into());
@@ -427,13 +434,13 @@ impl ValueLog {
     }
 
     #[doc(hidden)]
-    pub fn get_reader(&self) -> std::io::Result<MergeReader> {
+    pub fn get_reader(&self) -> crate::Result<MergeReader> {
         let segments = self.manifest.segments.read().expect("lock is poisoned");
 
         let readers = segments
             .values()
             .map(|x| x.scan())
-            .collect::<std::io::Result<Vec<_>>>()?;
+            .collect::<crate::Result<Vec<_>>>()?;
 
         Ok(MergeReader::new(readers))
     }
@@ -481,7 +488,7 @@ impl ValueLog {
         let readers = segments
             .into_iter()
             .map(|x| x.scan())
-            .collect::<std::io::Result<Vec<_>>>()?;
+            .collect::<crate::Result<Vec<_>>>()?;
 
         let reader = MergeReader::new(readers);
 

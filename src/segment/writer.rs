@@ -11,6 +11,8 @@ use std::{
     sync::Arc,
 };
 
+pub const BLOB_HEADER_MAGIC: &[u8] = &[b'V', b'L', b'G', b'B', b'L', b'O', b'B', b'1'];
+
 /// Segment writer
 pub struct Writer {
     pub path: PathBuf,
@@ -104,10 +106,12 @@ impl Writer {
             None => value.to_vec(),
         };
 
-        // Write CRC
         let mut hasher = crc32fast::Hasher::new();
         hasher.update(&value);
         let crc = hasher.finalize();
+
+        // Write header
+        self.active_writer.write_all(BLOB_HEADER_MAGIC)?;
 
         // Write key
 
@@ -117,6 +121,7 @@ impl Writer {
             .write_u16::<BigEndian>(key.len() as u16)?;
         self.active_writer.write_all(key)?;
 
+        // Write CRC
         self.active_writer.write_u32::<BigEndian>(crc)?;
 
         // Write value
@@ -126,6 +131,9 @@ impl Writer {
         self.active_writer
             .write_u32::<BigEndian>(value.len() as u32)?;
         self.active_writer.write_all(&value)?;
+
+        // Header
+        self.offset += BLOB_HEADER_MAGIC.len() as u64;
 
         // CRC
         self.offset += std::mem::size_of::<u32>() as u64;

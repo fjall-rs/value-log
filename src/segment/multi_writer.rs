@@ -1,4 +1,4 @@
-use super::writer::Writer;
+use super::writer::{Writer, BLOB_HEADER_MAGIC};
 use crate::{
     compression::Compressor,
     id::{IdGenerator, SegmentId},
@@ -87,7 +87,10 @@ impl MultiWriter {
         self.get_active_writer().offset()
         // NOTE: Point to the value record, not the key
         // The key is not really needed when dereferencing a value handle
-        + std::mem::size_of::<u16>() as u64 + key.len() as u64
+            + (BLOB_HEADER_MAGIC.len()
+            + std::mem::size_of::<u16>()
+            + key.len()
+        ) as u64
     }
 
     #[must_use]

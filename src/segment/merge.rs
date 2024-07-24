@@ -1,5 +1,5 @@
 use crate::{id::SegmentId, SegmentReader};
-use std::cmp::Reverse;
+use std::{cmp::Reverse, sync::Arc};
 
 // TODO: replace with MinHeap...
 use min_max_heap::MinMaxHeap;
@@ -9,8 +9,8 @@ type IteratorIndex = usize;
 #[derive(Debug)]
 struct IteratorValue {
     index: IteratorIndex,
-    key: Vec<u8>,
-    value: Vec<u8>,
+    key: Arc<[u8]>,
+    value: Arc<[u8]>,
     segment_id: SegmentId,
 }
 
@@ -77,7 +77,7 @@ impl MergeReader {
 }
 
 impl Iterator for MergeReader {
-    type Item = crate::Result<(Vec<u8>, Vec<u8>, SegmentId)>;
+    type Item = crate::Result<(Arc<[u8]>, Arc<[u8]>, SegmentId)>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.heap.is_empty() {
