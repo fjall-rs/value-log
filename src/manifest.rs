@@ -6,11 +6,12 @@ use crate::{
 };
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::{
-    collections::HashMap,
     io::{Cursor, Write},
     path::{Path, PathBuf},
     sync::{Arc, RwLock},
 };
+
+type HashMap<K, V> = ahash::HashMap<K, V>;
 
 pub const VLOG_MARKER: &str = ".vlog";
 pub const SEGMENTS_FOLDER: &str = "segments";
@@ -113,6 +114,8 @@ impl SegmentManifest {
         Self::remove_unfinished_segments(&segments_folder, &ids)?;
 
         let segments = {
+            use ahash::HashMapExt;
+
             let mut map = HashMap::with_capacity(100);
 
             for id in ids {

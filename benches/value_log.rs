@@ -1,7 +1,108 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use rand::RngCore;
+use rand::{Rng, RngCore};
 use std::sync::Arc;
-use value_log::{BlobCache, Config, ExternalIndex, MockIndex, ValueHandle, ValueLog};
+use value_log::{
+    BlobCache, Config, IndexReader, IndexWriter, MockIndex, MockIndexWriter, ValueLog,
+};
+
+fn hashmap(c: &mut Criterion) {
+    use ahash::HashMapExt;
+
+    let mut group = c.benchmark_group("hashmap");
+
+    group.bench_function("std".to_string(), |b| {
+        let mut s = std::collections::HashMap::new();
+        s.insert(4, "a");
+
+        b.iter(|| {
+            s.get(&4).unwrap();
+        })
+    });
+
+    group.bench_function("ahash".to_string(), |b| {
+        let mut a = ahash::HashMap::new();
+        a.insert(4, "a");
+
+        b.iter(|| {
+            a.get(&4).unwrap();
+        })
+    });
+}
+
+fn prefetch(c: &mut Criterion) {
+    let mut group = c.benchmark_group("prefetch range");
+
+    let range_size = 10;
+    let item_size = 1_024;
+
+    let index = MockIndex::default();
+    let mut index_writer = MockIndexWriter(index.clone());
+
+    let folder = tempfile::tempdir().unwrap();
+    let vl_path = folder.path();
+
+    let value_log = ValueLog::open(vl_path, Config::default()).unwrap();
+
+    let mut writer = value_log.get_writer().unwrap();
+
+    let mut rng = rand::thread_rng();
+
+    for key in (0u64..2_000_000).map(u64::to_be_bytes) {
+        let mut data = vec![0u8; item_size];
+        rng.fill_bytes(&mut data);
+
+        index_writer
+            .insert_indirect(&key, writer.get_next_value_handle(), data.len() as u32)
+            .unwrap();
+
+        writer.write(key, &data).unwrap();
+
+        data.clear();
+    }
+
+    value_log.register_writer(writer).unwrap();
+
+    let mut rng = rand::thread_rng();
+
+    group.bench_function(format!("{range_size}x{item_size}B - no prefetch"), |b| {
+        b.iter(|| {
+            let start = rng.gen_range(0u64..1_999_000);
+
+            for x in start..(start + range_size) {
+                let handle = index.get(&x.to_be_bytes()).unwrap().unwrap();
+
+                let value = value_log.get(&handle).unwrap().unwrap();
+
+                assert_eq!(item_size, value.len());
+            }
+        })
+    });
+
+    group.bench_function(format!("{range_size}x{item_size}B - with prefetch"), |b| {
+        b.iter(|| {
+            let start = rng.gen_range(0u64..1_999_000);
+
+            {
+                let handle = index.get(&start.to_be_bytes()).unwrap().unwrap();
+
+                let value = value_log
+                    .get_with_prefetch(&handle, (range_size - 1) as usize)
+                    .unwrap()
+                    .unwrap();
+
+                assert_eq!(item_size, value.len());
+            }
+
+            for x in (start..(start + range_size)).skip(1) {
+                let handle = index.get(&x.to_be_bytes()).unwrap().unwrap();
+
+                let value = value_log.get(&handle).unwrap().unwrap();
+
+                assert_eq!(item_size, value.len());
+            }
+        })
+    });
+}
 
 fn load_value(c: &mut Criterion) {
     let mut group = c.benchmark_group("load blob");
@@ -22,6 +123,7 @@ fn load_value(c: &mut Criterion) {
 
     {
         let index = MockIndex::default();
+        let mut index_writer = MockIndexWriter(index.clone());
 
         let folder = tempfile::tempdir().unwrap();
         let vl_path = folder.path();
@@ -33,21 +135,19 @@ fn load_value(c: &mut Criterion) {
         .unwrap();
 
         let mut writer = value_log.get_writer().unwrap();
-        let segment_id = writer.segment_id();
 
         let mut rng = rand::thread_rng();
 
         for size in sizes {
             let key = size.to_string();
-            let offset = writer.offset(key.as_bytes());
 
             let mut data = vec![0u8; size];
             rng.fill_bytes(&mut data);
 
-            index
-                .insert_indirection(
+            index_writer
+                .insert_indirect(
                     key.as_bytes(),
-                    ValueHandle { offset, segment_id },
+                    writer.get_next_value_handle(),
                     data.len() as u32,
                 )
                 .unwrap();
@@ -71,6 +171,7 @@ fn load_value(c: &mut Criterion) {
 
     {
         let index = MockIndex::default();
+        let mut index_writer = MockIndexWriter(index.clone());
 
         let folder = tempfile::tempdir().unwrap();
         let vl_path = folder.path();
@@ -83,21 +184,19 @@ fn load_value(c: &mut Criterion) {
         .unwrap();
 
         let mut writer = value_log.get_writer().unwrap();
-        let segment_id = writer.segment_id();
 
         let mut rng = rand::thread_rng();
 
         for size in sizes {
             let key = size.to_string();
-            let offset = writer.offset(key.as_bytes());
 
             let mut data = vec![0u8; size];
             rng.fill_bytes(&mut data);
 
-            index
-                .insert_indirection(
+            index_writer
+                .insert_indirect(
                     key.as_bytes(),
-                    ValueHandle { offset, segment_id },
+                    writer.get_next_value_handle(),
                     data.len() as u32,
                 )
                 .unwrap();
@@ -123,10 +222,11 @@ fn load_value(c: &mut Criterion) {
     }
 }
 
-fn compression(c: &mut Criterion) {
+/* fn compression(c: &mut Criterion) {
     let mut group = c.benchmark_group("compression");
 
     let index = MockIndex::default();
+    let mut index_writer = MockIndexWriter(index.clone());
 
     let folder = tempfile::tempdir().unwrap();
     let vl_path = folder.path();
@@ -138,7 +238,6 @@ fn compression(c: &mut Criterion) {
     .unwrap();
 
     let mut writer = value_log.get_writer().unwrap();
-    let segment_id = writer.segment_id();
 
     let mut rng = rand::thread_rng();
 
@@ -146,15 +245,14 @@ fn compression(c: &mut Criterion) {
 
     {
         let key = "random";
-        let offset = writer.offset(key.as_bytes());
 
         let mut data = vec![0u8; size_mb * 1_024 * 1_024];
         rng.fill_bytes(&mut data);
 
-        index
-            .insert_indirection(
+        index_writer
+            .insert_indirect(
                 key.as_bytes(),
-                ValueHandle { offset, segment_id },
+                writer.get_next_value_handle(),
                 data.len() as u32,
             )
             .unwrap();
@@ -164,15 +262,14 @@ fn compression(c: &mut Criterion) {
 
     {
         let key = "good_compression";
-        let offset = writer.offset(key.as_bytes());
 
         let dummy = b"abcdefgh";
         let data = dummy.repeat(size_mb * 1_024 * 1_024 / dummy.len());
 
-        index
-            .insert_indirection(
+        index_writer
+            .insert_indirect(
                 key.as_bytes(),
-                ValueHandle { offset, segment_id },
+                writer.get_next_value_handle(),
                 data.len() as u32,
             )
             .unwrap();
@@ -196,7 +293,7 @@ fn compression(c: &mut Criterion) {
             value_log.get(&handle_good_compression).unwrap().unwrap();
         })
     });
-}
+} */
 
-criterion_group!(benches, load_value, compression);
+criterion_group!(benches, hashmap, load_value, prefetch /* , compression */);
 criterion_main!(benches);

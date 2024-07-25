@@ -82,8 +82,9 @@ impl MultiWriter {
         }
     }
 
+    #[doc(hidden)]
     #[must_use]
-    fn offset(&self) -> u64 {
+    pub fn offset(&self) -> u64 {
         self.get_active_writer().offset()
     }
 

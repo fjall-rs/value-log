@@ -3,8 +3,8 @@ use crate::id::SegmentId;
 use byteorder::{BigEndian, ReadBytesExt};
 use std::{
     fs::File,
-    io::{BufReader, Read},
-    path::PathBuf,
+    io::{BufReader, Read, Seek},
+    path::Path,
     sync::Arc,
 };
 
@@ -21,15 +21,24 @@ impl Reader {
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    pub fn new<P: Into<PathBuf>>(path: P, segment_id: SegmentId) -> crate::Result<Self> {
-        let path = path.into();
+    pub fn new<P: AsRef<Path>>(path: P, segment_id: SegmentId) -> crate::Result<Self> {
         let file_reader = BufReader::new(File::open(path)?);
 
-        Ok(Self {
+        Ok(Self::with_reader(segment_id, file_reader))
+    }
+
+    pub(crate) fn get_offset(&mut self) -> std::io::Result<u64> {
+        self.inner.stream_position()
+    }
+
+    /// Initializes a new segment reader.
+    #[must_use]
+    pub fn with_reader(segment_id: SegmentId, file_reader: BufReader<File>) -> Self {
+        Self {
             segment_id,
             inner: file_reader,
             is_terminated: false,
-        })
+        }
     }
 }
 

@@ -5,15 +5,14 @@ use crate::{
     manifest::{SegmentManifest, SEGMENTS_FOLDER, VLOG_MARKER},
     path::absolute_path,
     scanner::{Scanner, SizeMap},
-    segment::{merge::MergeReader, writer::BLOB_HEADER_MAGIC},
+    segment::merge::MergeReader,
     value::UserValue,
     version::Version,
-    Config, IndexReader, SegmentWriter, ValueHandle,
+    Config, IndexReader, SegmentReader, SegmentWriter, ValueHandle,
 };
-use byteorder::{BigEndian, ReadBytesExt};
 use std::{
     fs::File,
-    io::{BufReader, Read, Seek},
+    io::{BufReader, Seek},
     path::PathBuf,
     sync::{atomic::AtomicU64, Arc, Mutex},
 };
@@ -189,7 +188,7 @@ impl ValueLog {
         })))
     }
 
-    /// Registers writer
+    /// Registers writer.
     ///
     /// # Errors
     ///
@@ -201,18 +200,53 @@ impl ValueLog {
         Ok(())
     }
 
-    /// Returns segment count
+    /// Returns segment count.
     #[must_use]
     pub fn segment_count(&self) -> usize {
         self.manifest.len()
     }
 
-    /// Resolves a value handle
+    /// Resolves a value handle.
     ///
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
     pub fn get(&self, handle: &ValueHandle) -> crate::Result<Option<UserValue>> {
+        /* let Some(segment) = self.manifest.get_segment(handle.segment_id) else {
+            return Ok(None);
+        };
+
+        if let Some(value) = self.blob_cache.get(&((self.id, handle.clone()).into())) {
+            eprintln!("got cached");
+            return Ok(Some(value));
+        }
+
+        let mut reader = BufReader::new(File::open(&segment.path)?);
+        reader.seek(std::io::SeekFrom::Start(handle.offset))?;
+        let mut reader = SegmentReader::with_reader(handle.segment_id, reader);
+
+        let Some(item) = reader.next() else {
+            return Ok(None);
+        };
+        let (_key, val, _crc) = item?;
+
+        self.blob_cache
+            .insert((self.id, handle.clone()).into(), val.clone());
+
+        Ok(Some(val)) */
+        self.get_with_prefetch(handle, 0)
+    }
+
+    /// Resolves a value handle.
+    ///
+    /// # Errors
+    ///
+    /// Will return `Err` if an IO error occurs.
+    pub fn get_with_prefetch(
+        &self,
+        handle: &ValueHandle,
+        prefetch_size: usize,
+    ) -> crate::Result<Option<UserValue>> {
         let Some(segment) = self.manifest.get_segment(handle.segment_id) else {
             return Ok(None);
         };
@@ -222,32 +256,37 @@ impl ValueLog {
         }
 
         let mut reader = BufReader::new(File::open(&segment.path)?);
-        reader.seek(std::io::SeekFrom::Start(
-            handle.offset + BLOB_HEADER_MAGIC.len() as u64,
-        ))?;
+        reader.seek(std::io::SeekFrom::Start(handle.offset))?;
+        let mut reader = SegmentReader::with_reader(handle.segment_id, reader);
 
-        // TODO: handle CRC
-        let _crc = reader.read_u32::<BigEndian>()?;
-
-        let key_len = reader.read_u16::<BigEndian>()?;
-        reader.seek_relative(key_len.into())?;
-
-        let val_len = reader.read_u32::<BigEndian>()?;
-
-        let mut value = vec![0; val_len as usize];
-        reader.read_exact(&mut value)?;
-
-        let value = self.config.compression.decompress(&value)?;
-
-        let val: UserValue = value.into();
+        let Some(item) = reader.next() else {
+            return Ok(None);
+        };
+        let (_key, val, _crc) = item?;
 
         self.blob_cache
             .insert((self.id, handle.clone()).into(), val.clone());
 
+        for _ in 0..prefetch_size {
+            let offset = reader.get_offset()?;
+
+            let Some(item) = reader.next() else {
+                break;
+            };
+            let (_key, val, _crc) = item?;
+
+            let value_handle = ValueHandle {
+                segment_id: handle.segment_id,
+                offset,
+            };
+
+            self.blob_cache.insert((self.id, value_handle).into(), val);
+        }
+
         Ok(Some(val))
     }
 
-    /// Initializes a new segment writer
+    /// Initializes a new segment writer.
     ///
     /// # Errors
     ///
@@ -368,7 +407,7 @@ impl ValueLog {
         }
     }
 
-    /// Returns the approximate space amplification
+    /// Returns the approximate space amplification.
     ///
     /// Returns 0.0 if there are no items.
     #[must_use]
