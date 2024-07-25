@@ -22,7 +22,7 @@ fn worst_case_space_amp() -> value_log::Result<()> {
         let mut index_writer = MockIndexWriter(index.clone());
         let mut writer = value_log.get_writer()?;
 
-        let handle = writer.get_next_value_handle(key);
+        let handle = writer.get_next_value_handle();
         index_writer.insert_indirect(key, handle, value.len() as u32)?;
 
         writer.write(key, value.as_bytes())?;
@@ -61,7 +61,7 @@ fn no_overlap_space_amp() -> value_log::Result<()> {
         let mut index_writer = MockIndexWriter(index.clone());
         let mut writer = value_log.get_writer()?;
 
-        let handle = writer.get_next_value_handle(key.as_bytes());
+        let handle = writer.get_next_value_handle();
         index_writer.insert_indirect(key.as_bytes(), handle, value.len() as u32)?;
 
         writer.write(key.as_bytes(), value.as_bytes())?;

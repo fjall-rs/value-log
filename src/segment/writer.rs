@@ -107,11 +107,15 @@ impl Writer {
         };
 
         let mut hasher = crc32fast::Hasher::new();
+        hasher.update(key);
         hasher.update(&value);
         let crc = hasher.finalize();
 
         // Write header
         self.active_writer.write_all(BLOB_HEADER_MAGIC)?;
+
+        // Write CRC
+        self.active_writer.write_u32::<BigEndian>(crc)?;
 
         // Write key
 
@@ -120,9 +124,6 @@ impl Writer {
         self.active_writer
             .write_u16::<BigEndian>(key.len() as u16)?;
         self.active_writer.write_all(key)?;
-
-        // Write CRC
-        self.active_writer.write_u32::<BigEndian>(crc)?;
 
         // Write value
 

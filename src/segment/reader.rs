@@ -34,7 +34,7 @@ impl Reader {
 }
 
 impl Iterator for Reader {
-    type Item = crate::Result<(Arc<[u8]>, Arc<[u8]>)>;
+    type Item = crate::Result<(Arc<[u8]>, Arc<[u8]>, u32)>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.is_terminated {
@@ -60,6 +60,16 @@ impl Iterator for Reader {
             }
         }
 
+        let crc = match self.inner.read_u32::<BigEndian>() {
+            Ok(v) => v,
+            Err(e) => {
+                if e.kind() == std::io::ErrorKind::UnexpectedEof {
+                    return None;
+                }
+                return Some(Err(e.into()));
+            }
+        };
+
         let key_len = match self.inner.read_u16::<BigEndian>() {
             Ok(v) => v,
             Err(e) => {
@@ -73,17 +83,6 @@ impl Iterator for Reader {
         let mut key = vec![0; key_len.into()];
         if let Err(e) = self.inner.read_exact(&mut key) {
             return Some(Err(e.into()));
-        };
-
-        // TODO: handle crc
-        let _crc = match self.inner.read_u32::<BigEndian>() {
-            Ok(v) => v,
-            Err(e) => {
-                if e.kind() == std::io::ErrorKind::UnexpectedEof {
-                    return None;
-                }
-                return Some(Err(e.into()));
-            }
         };
 
         let val_len = match self.inner.read_u32::<BigEndian>() {
@@ -101,6 +100,6 @@ impl Iterator for Reader {
             return Some(Err(e.into()));
         };
 
-        Some(Ok((key.into(), val.into())))
+        Some(Ok((key.into(), val.into(), crc)))
     }
 }

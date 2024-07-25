@@ -5,7 +5,7 @@ use crate::{
     manifest::{SegmentManifest, SEGMENTS_FOLDER, VLOG_MARKER},
     path::absolute_path,
     scanner::{Scanner, SizeMap},
-    segment::merge::MergeReader,
+    segment::{merge::MergeReader, writer::BLOB_HEADER_MAGIC},
     value::UserValue,
     version::Version,
     Config, IndexReader, SegmentWriter, ValueHandle,
@@ -89,7 +89,21 @@ impl ValueLog {
     pub fn verify(&self) -> crate::Result<usize> {
         let _lock = self.rollover_guard.lock().expect("lock is poisoned");
 
-        Ok(0)
+        let mut sum = 0;
+
+        for item in self.get_reader()? {
+            let (k, v, _, crc) = item?;
+
+            let mut hasher = crc32fast::Hasher::new();
+            hasher.update(&k);
+            hasher.update(&v);
+
+            if hasher.finalize() != crc {
+                sum += 1;
+            }
+        }
+
+        Ok(sum)
     }
 
     /// Creates a new empty value log in a directory.
@@ -208,9 +222,15 @@ impl ValueLog {
         }
 
         let mut reader = BufReader::new(File::open(&segment.path)?);
-        reader.seek(std::io::SeekFrom::Start(handle.offset))?;
+        reader.seek(std::io::SeekFrom::Start(
+            handle.offset + BLOB_HEADER_MAGIC.len() as u64,
+        ))?;
 
+        // TODO: handle CRC
         let _crc = reader.read_u32::<BigEndian>()?;
+
+        let key_len = reader.read_u16::<BigEndian>()?;
+        reader.seek_relative(key_len.into())?;
 
         let val_len = reader.read_u32::<BigEndian>()?;
 
@@ -218,8 +238,6 @@ impl ValueLog {
         reader.read_exact(&mut value)?;
 
         let value = self.config.compression.decompress(&value)?;
-
-        // TODO: handle CRC
 
         let val: UserValue = value.into();
 
@@ -497,7 +515,7 @@ impl ValueLog {
             .use_compression(self.config.compression.clone());
 
         for item in reader {
-            let (k, v, segment_id) = item?;
+            let (k, v, segment_id, _) = item?;
 
             match index_reader.get(&k)? {
                 // If this value is in an older segment, we can discard it
@@ -506,7 +524,7 @@ impl ValueLog {
                 _ => {}
             }
 
-            let vhandle = writer.get_next_value_handle(&k);
+            let vhandle = writer.get_next_value_handle();
             index_writer.insert_indirect(&k, vhandle, v.len() as u32)?;
 
             writer.write(&k, &v)?;
