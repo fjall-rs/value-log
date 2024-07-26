@@ -21,7 +21,7 @@ use std::{
 #[allow(clippy::module_name_repetitions)]
 pub type ValueLogId = u64;
 
-/// Hands out a unique (monotonically increasing) value log ID
+/// Hands out a unique (monotonically increasing) value log ID.
 pub fn get_next_vlog_id() -> ValueLogId {
     static VLOG_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
     VLOG_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
@@ -188,7 +188,7 @@ impl ValueLog {
         })))
     }
 
-    /// Registers writer.
+    /// Registers a [`SegmentWriter`].
     ///
     /// # Errors
     ///
@@ -200,7 +200,7 @@ impl ValueLog {
         Ok(())
     }
 
-    /// Returns segment count.
+    /// Returns the amount of segments in the value log.
     #[must_use]
     pub fn segment_count(&self) -> usize {
         self.manifest.len()
@@ -215,7 +215,7 @@ impl ValueLog {
         self.get_with_prefetch(handle, 0)
     }
 
-    /// Resolves a value handle.
+    /// Resolves a value handle, and prefetches some values after it.
     ///
     /// # Errors
     ///
