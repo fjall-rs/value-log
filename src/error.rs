@@ -4,7 +4,7 @@ use crate::{
     version::Version,
 };
 
-/// Represents errors that can occur in the value-log
+/// Represents errors that can occur in the value log
 #[derive(Debug)]
 pub enum Error {
     /// I/O error
