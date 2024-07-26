@@ -112,7 +112,7 @@ pub use {
     handle::ValueHandle,
     index::{Reader as IndexReader, Writer as IndexWriter},
     segment::multi_writer::MultiWriter as SegmentWriter,
-    value::UserValue,
+    value::{UserKey, UserValue},
     value_log::ValueLog,
     version::Version,
 };

@@ -1,5 +1,5 @@
 use super::{meta::METADATA_HEADER_MAGIC, writer::BLOB_HEADER_MAGIC};
-use crate::{id::SegmentId, Compressor};
+use crate::{id::SegmentId, value::UserKey, Compressor, UserValue};
 use byteorder::{BigEndian, ReadBytesExt};
 use std::{
     fs::File,
@@ -50,7 +50,7 @@ impl Reader {
 }
 
 impl Iterator for Reader {
-    type Item = crate::Result<(Arc<[u8]>, Arc<[u8]>, u32)>;
+    type Item = crate::Result<(UserKey, UserValue, u32)>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.is_terminated {

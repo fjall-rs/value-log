@@ -1,10 +1,10 @@
-use crate::{IndexReader, IndexWriter, ValueHandle};
+use crate::{value::UserKey, IndexReader, IndexWriter, ValueHandle};
 use std::{
     collections::BTreeMap,
     sync::{Arc, RwLock},
 };
 
-type MockIndexInner = RwLock<BTreeMap<Arc<[u8]>, (ValueHandle, u32)>>;
+type MockIndexInner = RwLock<BTreeMap<UserKey, (ValueHandle, u32)>>;
 
 /// Mock in-memory index
 #[allow(clippy::module_name_repetitions)]

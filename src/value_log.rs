@@ -444,7 +444,7 @@ impl ValueLog {
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    #[allow(clippy::result_unit_err)]
+    #[allow(clippy::result_uAnit_err)]
     pub fn scan_for_stats(
         &self,
         iter: impl Iterator<Item = std::io::Result<(ValueHandle, u32)>>,

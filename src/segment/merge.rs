@@ -1,4 +1,4 @@
-use crate::{id::SegmentId, SegmentReader};
+use crate::{id::SegmentId, value::UserKey, SegmentReader, UserValue};
 use std::{cmp::Reverse, sync::Arc};
 
 // TODO: replace with MinHeap...
@@ -9,8 +9,8 @@ type IteratorIndex = usize;
 #[derive(Debug)]
 struct IteratorValue {
     index: IteratorIndex,
-    key: Arc<[u8]>,
-    value: Arc<[u8]>,
+    key: UserKey,
+    value: UserValue,
     segment_id: SegmentId,
     crc: u32,
 }
@@ -79,7 +79,7 @@ impl MergeReader {
 }
 
 impl Iterator for MergeReader {
-    type Item = crate::Result<(Arc<[u8]>, Arc<[u8]>, SegmentId, u32)>;
+    type Item = crate::Result<(UserKey, UserValue, SegmentId, u32)>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.heap.is_empty() {
