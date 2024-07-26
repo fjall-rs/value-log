@@ -1,5 +1,5 @@
 use super::{meta::METADATA_HEADER_MAGIC, writer::BLOB_HEADER_MAGIC};
-use crate::id::SegmentId;
+use crate::{id::SegmentId, Compressor};
 use byteorder::{BigEndian, ReadBytesExt};
 use std::{
     fs::File,
@@ -13,6 +13,7 @@ pub struct Reader {
     pub(crate) segment_id: SegmentId,
     inner: BufReader<File>,
     is_terminated: bool,
+    compression: Option<Arc<dyn Compressor>>,
 }
 
 impl Reader {
@@ -38,7 +39,13 @@ impl Reader {
             segment_id,
             inner: file_reader,
             is_terminated: false,
+            compression: None,
         }
+    }
+
+    pub(crate) fn use_compression(mut self, compressor: Arc<dyn Compressor>) -> Self {
+        self.compression = Some(compressor);
+        self
     }
 }
 
@@ -107,6 +114,14 @@ impl Iterator for Reader {
         let mut val = vec![0; val_len as usize];
         if let Err(e) = self.inner.read_exact(&mut val) {
             return Some(Err(e.into()));
+        };
+
+        let val = match &self.compression {
+            Some(compressor) => match compressor.decompress(&val) {
+                Ok(val) => val,
+                Err(e) => return Some(Err(e.into())),
+            },
+            None => val,
         };
 
         Some(Ok((key.into(), val.into(), crc)))

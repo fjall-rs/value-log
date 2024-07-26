@@ -212,28 +212,6 @@ impl ValueLog {
     ///
     /// Will return `Err` if an IO error occurs.
     pub fn get(&self, handle: &ValueHandle) -> crate::Result<Option<UserValue>> {
-        /* let Some(segment) = self.manifest.get_segment(handle.segment_id) else {
-            return Ok(None);
-        };
-
-        if let Some(value) = self.blob_cache.get(&((self.id, handle.clone()).into())) {
-            eprintln!("got cached");
-            return Ok(Some(value));
-        }
-
-        let mut reader = BufReader::new(File::open(&segment.path)?);
-        reader.seek(std::io::SeekFrom::Start(handle.offset))?;
-        let mut reader = SegmentReader::with_reader(handle.segment_id, reader);
-
-        let Some(item) = reader.next() else {
-            return Ok(None);
-        };
-        let (_key, val, _crc) = item?;
-
-        self.blob_cache
-            .insert((self.id, handle.clone()).into(), val.clone());
-
-        Ok(Some(val)) */
         self.get_with_prefetch(handle, 0)
     }
 
@@ -257,7 +235,8 @@ impl ValueLog {
 
         let mut reader = BufReader::new(File::open(&segment.path)?);
         reader.seek(std::io::SeekFrom::Start(handle.offset))?;
-        let mut reader = SegmentReader::with_reader(handle.segment_id, reader);
+        let mut reader = SegmentReader::with_reader(handle.segment_id, reader)
+            .use_compression(self.config.compression.clone());
 
         let Some(item) = reader.next() else {
             return Ok(None);
@@ -547,11 +526,11 @@ impl ValueLog {
             .map(|x| x.scan())
             .collect::<crate::Result<Vec<_>>>()?;
 
+        // IMPORTANT: We purposefully don't use compression
+        // to just pipe the compressed value directly to the new blob file
+        // without having to pay (de)compressionn costs
         let reader = MergeReader::new(readers);
-
-        let mut writer = self
-            .get_writer()?
-            .use_compression(self.config.compression.clone());
+        let mut writer = self.get_writer()?;
 
         for item in reader {
             let (k, v, segment_id, _) = item?;
