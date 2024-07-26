@@ -439,7 +439,7 @@ impl ValueLog {
         }
     }
 
-    /// Scans the given index and collecting GC statistics.
+    /// Scans the given index and collects GC statistics.
     ///
     /// # Errors
     ///
