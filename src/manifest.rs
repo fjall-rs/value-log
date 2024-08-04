@@ -2,7 +2,7 @@ use crate::{
     id::SegmentId,
     key_range::KeyRange,
     segment::{gc_stats::GcStats, meta::Metadata, trailer::SegmentFileTrailer},
-    Segment, SegmentWriter as MultiWriter,
+    HashMap, Segment, SegmentWriter as MultiWriter,
 };
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::{
@@ -10,8 +10,6 @@ use std::{
     path::{Path, PathBuf},
     sync::{Arc, RwLock},
 };
-
-type HashMap<K, V> = ahash::HashMap<K, V>;
 
 pub const VLOG_MARKER: &str = ".vlog";
 pub const SEGMENTS_FOLDER: &str = "segments";

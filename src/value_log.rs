@@ -352,18 +352,24 @@ impl ValueLog {
         // IMPORTANT: Only allow 1 rollover or GC at any given time
         let _guard = self.rollover_guard.lock().expect("lock is poisoned");
 
-        let ids = self
+        let segments = self
             .manifest
             .segments
             .read()
             .expect("lock is poisoned")
             .values()
             .filter(|x| x.is_stale())
-            .map(|x| x.id)
+            .cloned()
             .collect::<Vec<_>>();
+
+        let ids = segments.iter().map(|x| x.id).collect::<Vec<_>>();
 
         log::info!("Dropping stale blob files: {ids:?}");
         self.manifest.drop_segments(&ids)?;
+
+        for segment in segments {
+            std::fs::remove_file(&segment.path)?;
+        }
 
         Ok(())
     }
@@ -444,7 +450,6 @@ impl ValueLog {
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    #[allow(clippy::result_uAnit_err)]
     pub fn scan_for_stats(
         &self,
         iter: impl Iterator<Item = std::io::Result<(ValueHandle, u32)>>,

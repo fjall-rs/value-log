@@ -104,6 +104,8 @@ mod value;
 mod value_log;
 mod version;
 
+pub(crate) type HashMap<K, V> = ahash::HashMap<K, V>;
+
 pub use {
     blob_cache::BlobCache,
     compression::{CompressError, Compressor, DecompressError},

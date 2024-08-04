@@ -1,5 +1,5 @@
 use crate::{id::SegmentId, value::UserKey, SegmentReader, UserValue};
-use std::{cmp::Reverse, sync::Arc};
+use std::cmp::Reverse;
 
 // TODO: replace with MinHeap...
 use min_max_heap::MinMaxHeap;

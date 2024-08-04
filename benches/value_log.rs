@@ -5,30 +5,6 @@ use value_log::{
     BlobCache, Config, IndexReader, IndexWriter, MockIndex, MockIndexWriter, ValueLog,
 };
 
-fn hashmap(c: &mut Criterion) {
-    use ahash::HashMapExt;
-
-    let mut group = c.benchmark_group("hashmap");
-
-    group.bench_function("std".to_string(), |b| {
-        let mut s = std::collections::HashMap::new();
-        s.insert(4, "a");
-
-        b.iter(|| {
-            s.get(&4).unwrap();
-        })
-    });
-
-    group.bench_function("ahash".to_string(), |b| {
-        let mut a = ahash::HashMap::new();
-        a.insert(4, "a");
-
-        b.iter(|| {
-            a.get(&4).unwrap();
-        })
-    });
-}
-
 fn prefetch(c: &mut Criterion) {
     let mut group = c.benchmark_group("prefetch range");
 
