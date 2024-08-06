@@ -11,7 +11,7 @@
 ![MSRV](https://img.shields.io/badge/MSRV-1.74.0-blue)
 [![dependency status](https://deps.rs/repo/github/fjall-rs/value-log/status.svg)](https://deps.rs/repo/github/fjall-rs/value-log)
 
-Generic value log implementation for key-value separated storage, inspired by RocksDB's BlobDB [[1]](#footnotes) and implemented in safe, stable Rust.
+Generic value log implementation for key-value separated storage, inspired by RocksDB's BlobDB [[1]](#footnotes) and Titan [[2]](#footnotes) and implemented in safe, stable Rust.
 
 > This crate is intended as a building block for key-value separated storage.
 > You probably want to use https://github.com/fjall-rs/fjall instead.
@@ -48,3 +48,6 @@ All contributions are to be licensed as MIT OR Apache-2.0.
 ## Footnotes
 
 [1] https://github.com/facebook/rocksdb/wiki/BlobDB
+
+[2] https://docs.pingcap.com/tidb/stable/titan-overview/
+
