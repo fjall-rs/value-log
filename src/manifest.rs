@@ -159,12 +159,12 @@ impl SegmentManifest {
         &self,
         f: F,
     ) -> crate::Result<()> {
+        let mut prev_segments = self.segments.write().expect("lock is poisoned");
+
         // NOTE: Create a copy of the levels we can operate on
         // without mutating the current level manifest
         // If persisting to disk fails, this way the level manifest
         // is unchanged
-        let mut prev_segments = self.segments.write().expect("lock is poisoned");
-
         let mut working_copy = prev_segments.clone();
 
         f(&mut working_copy);
@@ -173,6 +173,10 @@ impl SegmentManifest {
 
         Self::write_to_disk(&self.path, &ids)?;
         *prev_segments = working_copy;
+
+        // NOTE: Lock needs to live until end of function because
+        // writing to disk needs to be exclusive
+        drop(prev_segments);
 
         log::trace!("Swapped vLog segment list to: {ids:?}");
 
@@ -215,6 +219,10 @@ impl SegmentManifest {
                             item_count: writer.item_count,
                             compressed_bytes: writer.written_blob_bytes,
                             total_uncompressed_bytes: writer.uncompressed_bytes,
+
+                            // NOTE: We are checking for 0 items above
+                            // so first and last key need to exist
+                            #[allow(clippy::expect_used)]
                             key_range: KeyRange::new((
                                 writer
                                     .first_key
@@ -336,6 +344,7 @@ impl SegmentManifest {
 
     /// Returns the percent of dead bytes (uncompressed) in the value log
     #[must_use]
+    #[allow(clippy::cast_precision_loss)]
     pub fn stale_ratio(&self) -> f32 {
         let total_bytes = self.total_bytes();
         if total_bytes == 0 {
@@ -355,6 +364,7 @@ impl SegmentManifest {
     ///
     /// Returns 0.0 if there are no items or the entire value log is stale.
     #[must_use]
+    #[allow(clippy::cast_precision_loss)]
     pub fn space_amp(&self) -> f32 {
         let total_bytes = self.total_bytes();
         if total_bytes == 0 {

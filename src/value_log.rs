@@ -195,7 +195,6 @@ impl ValueLog {
     /// Will return `Err` if an IO error occurs.
     pub fn register_writer(&self, writer: SegmentWriter) -> crate::Result<()> {
         let _lock = self.rollover_guard.lock().expect("lock is poisoned");
-
         self.manifest.register(writer)?;
         Ok(())
     }
@@ -282,6 +281,7 @@ impl ValueLog {
     /// Tries to find a least-effort-selection of segments to
     /// merge to reach a certain space amplification.
     #[must_use]
+    #[allow(clippy::cast_precision_loss, clippy::significant_drop_tightening)]
     pub fn select_segments_for_space_amp_reduction(&self, space_amp_target: f32) -> Vec<SegmentId> {
         let current_space_amp = self.space_amp();
 
@@ -381,6 +381,7 @@ impl ValueLog {
     /// Will return `Err` if an IO error occurs.
     fn mark_as_stale(&self, ids: &[SegmentId]) {
         // NOTE: Read-locking is fine because we are dealing with an atomic bool
+        #[allow(clippy::significant_drop_tightening)]
         let segments = self.manifest.segments.read().expect("lock is poisoned");
 
         for id in ids {
@@ -401,6 +402,7 @@ impl ValueLog {
     }
 
     #[doc(hidden)]
+    #[allow(clippy::cast_precision_loss)]
     pub fn consume_scan_result(&self, segment_ids: &[u64], size_map: &SizeMap) {
         for (&id, counter) in size_map {
             let used_size = counter.size;
