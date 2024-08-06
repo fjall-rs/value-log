@@ -25,8 +25,8 @@ pub enum Error {
     /// Decompression failed
     Decompress(DecompressError),
     // TODO:
-    // /// CRC check failed
-    // CrcMismatch,
+    // /// Checksum check failed
+    // ChecksumMismatch,
 }
 
 impl std::fmt::Display for Error {

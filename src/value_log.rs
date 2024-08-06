@@ -91,13 +91,13 @@ impl ValueLog {
         let mut sum = 0;
 
         for item in self.get_reader()? {
-            let (k, v, _, crc) = item?;
+            let (k, v, _, expected_checksum) = item?;
 
-            let mut hasher = crc32fast::Hasher::new();
+            let mut hasher = xxhash_rust::xxh3::Xxh3::new();
             hasher.update(&k);
             hasher.update(&v);
 
-            if hasher.finalize() != crc {
+            if hasher.digest() != expected_checksum {
                 sum += 1;
             }
         }
@@ -241,7 +241,7 @@ impl ValueLog {
         let Some(item) = reader.next() else {
             return Ok(None);
         };
-        let (_key, val, _crc) = item?;
+        let (_key, val, _checksum) = item?;
 
         self.blob_cache
             .insert((self.id, handle.clone()).into(), val.clone());
@@ -252,7 +252,7 @@ impl ValueLog {
             let Some(item) = reader.next() else {
                 break;
             };
-            let (_key, val, _crc) = item?;
+            let (_key, val, _checksum) = item?;
 
             let value_handle = ValueHandle {
                 segment_id: handle.segment_id,

@@ -50,7 +50,7 @@ impl Reader {
 }
 
 impl Iterator for Reader {
-    type Item = crate::Result<(UserKey, UserValue, u32)>;
+    type Item = crate::Result<(UserKey, UserValue, u64)>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.is_terminated {
@@ -76,7 +76,7 @@ impl Iterator for Reader {
             }
         }
 
-        let crc = match self.inner.read_u32::<BigEndian>() {
+        let checksum = match self.inner.read_u64::<BigEndian>() {
             Ok(v) => v,
             Err(e) => {
                 if e.kind() == std::io::ErrorKind::UnexpectedEof {
@@ -124,6 +124,6 @@ impl Iterator for Reader {
             None => val,
         };
 
-        Some(Ok((key.into(), val.into(), crc)))
+        Some(Ok((key.into(), val.into(), checksum)))
     }
 }

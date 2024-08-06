@@ -12,7 +12,7 @@ struct IteratorValue {
     key: UserKey,
     value: UserValue,
     segment_id: SegmentId,
-    crc: u32,
+    checksum: u64,
 }
 
 impl PartialEq for IteratorValue {
@@ -54,7 +54,7 @@ impl MergeReader {
         let reader = self.readers.get_mut(idx).expect("iter should exist");
 
         if let Some(value) = reader.next() {
-            let (k, v, crc) = value?;
+            let (k, v, checksum) = value?;
             let segment_id = reader.segment_id;
 
             self.heap.push(IteratorValue {
@@ -62,7 +62,7 @@ impl MergeReader {
                 key: k,
                 value: v,
                 segment_id,
-                crc,
+                checksum,
             });
         }
 
@@ -79,7 +79,7 @@ impl MergeReader {
 }
 
 impl Iterator for MergeReader {
-    type Item = crate::Result<(UserKey, UserValue, SegmentId, u32)>;
+    type Item = crate::Result<(UserKey, UserValue, SegmentId, u64)>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.heap.is_empty() {
@@ -107,7 +107,7 @@ impl Iterator for MergeReader {
                 }
             }
 
-            return Some(Ok((head.key, head.value, head.segment_id, head.crc)));
+            return Some(Ok((head.key, head.value, head.segment_id, head.checksum)));
         }
 
         None

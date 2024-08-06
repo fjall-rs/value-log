@@ -106,16 +106,16 @@ impl Writer {
             None => value.to_vec(),
         };
 
-        let mut hasher = crc32fast::Hasher::new();
+        let mut hasher = xxhash_rust::xxh3::Xxh3::new();
         hasher.update(key);
         hasher.update(&value);
-        let crc = hasher.finalize();
+        let checksum = hasher.digest();
 
         // Write header
         self.active_writer.write_all(BLOB_HEADER_MAGIC)?;
 
-        // Write CRC
-        self.active_writer.write_u32::<BigEndian>(crc)?;
+        // Write checksum
+        self.active_writer.write_u64::<BigEndian>(checksum)?;
 
         // Write key
 
@@ -136,8 +136,8 @@ impl Writer {
         // Header
         self.offset += BLOB_HEADER_MAGIC.len() as u64;
 
-        // CRC
-        self.offset += std::mem::size_of::<u32>() as u64;
+        // Checksum
+        self.offset += std::mem::size_of::<u64>() as u64;
 
         // Key
         self.offset += std::mem::size_of::<u16>() as u64;
