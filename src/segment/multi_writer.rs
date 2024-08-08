@@ -51,6 +51,7 @@ impl MultiWriter {
 
     /// Sets the compression method
     #[must_use]
+    #[doc(hidden)]
     pub fn use_compression(mut self, compressor: Arc<dyn Compressor>) -> Self {
         self.compression = Some(compressor.clone());
         self.get_active_writer_mut().compression = Some(compressor);
@@ -111,7 +112,7 @@ impl MultiWriter {
         Ok(())
     }
 
-    /// Writes an item
+    /// Writes an item.
     ///
     /// # Errors
     ///
