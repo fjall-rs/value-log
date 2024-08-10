@@ -1,16 +1,15 @@
-use std::sync::Arc;
 use test_log::test;
 use value_log::{Compressor, Config, IndexWriter, MockIndex, MockIndexWriter, ValueLog};
 
+#[derive(Clone, Default)]
 struct Lz4Compressor;
 impl Compressor for Lz4Compressor {
-    fn compress(&self, bytes: &[u8]) -> Result<Vec<u8>, value_log::CompressError> {
+    fn compress(&self, bytes: &[u8]) -> value_log::Result<Vec<u8>> {
         Ok(lz4_flex::compress_prepend_size(bytes))
     }
 
-    fn decompress(&self, bytes: &[u8]) -> Result<Vec<u8>, value_log::DecompressError> {
-        lz4_flex::decompress_size_prepended(bytes)
-            .map_err(|e| value_log::DecompressError(e.to_string()))
+    fn decompress(&self, bytes: &[u8]) -> value_log::Result<Vec<u8>> {
+        lz4_flex::decompress_size_prepended(bytes).map_err(|_| value_log::Error::Decompress)
     }
 }
 
@@ -21,10 +20,7 @@ fn compression() -> value_log::Result<()> {
 
     let index = MockIndex::default();
 
-    let value_log = ValueLog::open(
-        vl_path,
-        Config::default().use_compression(Arc::new(Lz4Compressor)),
-    )?;
+    let value_log = ValueLog::open(vl_path, Config::<Lz4Compressor>::default())?;
 
     let mut index_writer = MockIndexWriter(index.clone());
     let mut writer = value_log.get_writer()?;

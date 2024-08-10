@@ -1,5 +1,4 @@
 use crate::{
-    compression::{CompressError, DecompressError},
     serde::{DeserializeError, SerializeError},
     version::Version,
 };
@@ -20,10 +19,10 @@ pub enum Error {
     Deserialize(DeserializeError),
 
     /// Compression failed
-    Compress(CompressError),
+    Compress,
 
     /// Decompression failed
-    Decompress(DecompressError),
+    Decompress,
     // TODO:
     // /// Checksum check failed
     // ChecksumMismatch,
@@ -52,18 +51,6 @@ impl From<SerializeError> for Error {
 impl From<DeserializeError> for Error {
     fn from(value: DeserializeError) -> Self {
         Self::Deserialize(value)
-    }
-}
-
-impl From<CompressError> for Error {
-    fn from(value: CompressError) -> Self {
-        Self::Compress(value)
-    }
-}
-
-impl From<DecompressError> for Error {
-    fn from(value: DecompressError) -> Self {
-        Self::Decompress(value)
     }
 }
 

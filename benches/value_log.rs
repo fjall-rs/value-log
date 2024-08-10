@@ -2,8 +2,21 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use rand::{Rng, RngCore};
 use std::sync::Arc;
 use value_log::{
-    BlobCache, Config, IndexReader, IndexWriter, MockIndex, MockIndexWriter, ValueLog,
+    BlobCache, Compressor, Config, IndexReader, IndexWriter, MockIndex, MockIndexWriter, ValueLog,
 };
+
+#[derive(Clone, Default)]
+struct NoCompressor;
+
+impl Compressor for NoCompressor {
+    fn compress(&self, bytes: &[u8]) -> value_log::Result<Vec<u8>> {
+        Ok(bytes.into())
+    }
+
+    fn decompress(&self, bytes: &[u8]) -> value_log::Result<Vec<u8>> {
+        Ok(bytes.into())
+    }
+}
 
 fn prefetch(c: &mut Criterion) {
     let mut group = c.benchmark_group("prefetch range");
@@ -17,7 +30,7 @@ fn prefetch(c: &mut Criterion) {
     let folder = tempfile::tempdir().unwrap();
     let vl_path = folder.path();
 
-    let value_log = ValueLog::open(vl_path, Config::default()).unwrap();
+    let value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default()).unwrap();
 
     let mut writer = value_log.get_writer().unwrap();
 
@@ -106,7 +119,8 @@ fn load_value(c: &mut Criterion) {
 
         let value_log = ValueLog::open(
             vl_path,
-            Config::default().blob_cache(Arc::new(BlobCache::with_capacity_bytes(0))),
+            Config::<NoCompressor>::default()
+                .blob_cache(Arc::new(BlobCache::with_capacity_bytes(0))),
         )
         .unwrap();
 
@@ -154,7 +168,7 @@ fn load_value(c: &mut Criterion) {
 
         let value_log = ValueLog::open(
             vl_path,
-            Config::default()
+            Config::<NoCompressor>::default()
                 .blob_cache(Arc::new(BlobCache::with_capacity_bytes(64 * 1_024 * 1_024))),
         )
         .unwrap();

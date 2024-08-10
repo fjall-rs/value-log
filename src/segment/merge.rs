@@ -1,4 +1,4 @@
-use crate::{id::SegmentId, value::UserKey, SegmentReader, UserValue};
+use crate::{id::SegmentId, value::UserKey, Compressor, SegmentReader, UserValue};
 use std::cmp::Reverse;
 
 // TODO: replace with MinHeap...
@@ -36,14 +36,14 @@ impl Ord for IteratorValue {
 
 /// Interleaves multiple segment readers into a single, sorted stream
 #[allow(clippy::module_name_repetitions)]
-pub struct MergeReader {
-    readers: Vec<SegmentReader>,
+pub struct MergeReader<C: Compressor + Clone> {
+    readers: Vec<SegmentReader<C>>,
     heap: MinMaxHeap<IteratorValue>,
 }
 
-impl MergeReader {
+impl<C: Compressor + Clone> MergeReader<C> {
     /// Initializes a new merging reader
-    pub fn new(readers: Vec<SegmentReader>) -> Self {
+    pub fn new(readers: Vec<SegmentReader<C>>) -> Self {
         Self {
             readers,
             heap: MinMaxHeap::new(),
@@ -78,7 +78,7 @@ impl MergeReader {
     }
 }
 
-impl Iterator for MergeReader {
+impl<C: Compressor + Clone> Iterator for MergeReader<C> {
     type Item = crate::Result<(UserKey, UserValue, SegmentId, u64)>;
 
     fn next(&mut self) -> Option<Self::Item> {

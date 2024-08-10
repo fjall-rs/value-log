@@ -2,11 +2,12 @@ use crate::{
     id::SegmentId,
     key_range::KeyRange,
     segment::{gc_stats::GcStats, meta::Metadata, trailer::SegmentFileTrailer},
-    HashMap, Segment, SegmentWriter as MultiWriter,
+    Compressor, HashMap, Segment, SegmentWriter as MultiWriter,
 };
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::{
     io::{Cursor, Write},
+    marker::PhantomData,
     path::{Path, PathBuf},
     sync::{Arc, RwLock},
 };
@@ -36,24 +37,24 @@ fn rewrite_atomic<P: AsRef<Path>>(path: P, content: &[u8]) -> std::io::Result<()
 }
 
 #[allow(clippy::module_name_repetitions)]
-pub struct SegmentManifestInner {
+pub struct SegmentManifestInner<C: Compressor + Clone> {
     path: PathBuf,
-    pub segments: RwLock<HashMap<SegmentId, Arc<Segment>>>,
+    pub segments: RwLock<HashMap<SegmentId, Arc<Segment<C>>>>,
 }
 
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone)]
-pub struct SegmentManifest(Arc<SegmentManifestInner>);
+pub struct SegmentManifest<C: Compressor + Clone>(Arc<SegmentManifestInner<C>>);
 
-impl std::ops::Deref for SegmentManifest {
-    type Target = SegmentManifestInner;
+impl<C: Compressor + Clone> std::ops::Deref for SegmentManifest<C> {
+    type Target = SegmentManifestInner<C>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl SegmentManifest {
+impl<C: Compressor + Clone> SegmentManifest<C> {
     fn remove_unfinished_segments<P: AsRef<Path>>(
         folder: P,
         registered_ids: &[u64],
@@ -129,6 +130,7 @@ impl SegmentManifest {
                         path,
                         meta: trailer.metadata,
                         gc_stats: GcStats::default(),
+                        _phantom: PhantomData,
                     }),
                 );
             }
@@ -155,7 +157,7 @@ impl SegmentManifest {
     }
 
     /// Modifies the level manifest atomically.
-    pub(crate) fn atomic_swap<F: FnOnce(&mut HashMap<SegmentId, Arc<Segment>>)>(
+    pub(crate) fn atomic_swap<F: FnOnce(&mut HashMap<SegmentId, Arc<Segment<C>>>)>(
         &self,
         f: F,
     ) -> crate::Result<()> {
@@ -189,7 +191,7 @@ impl SegmentManifest {
         })
     }
 
-    pub fn register(&self, writer: MultiWriter) -> crate::Result<()> {
+    pub fn register(&self, writer: MultiWriter<C>) -> crate::Result<()> {
         let writers = writer.finish()?;
 
         self.atomic_swap(move |recipe| {
@@ -235,6 +237,7 @@ impl SegmentManifest {
                             )),
                         },
                         gc_stats: GcStats::default(),
+                        _phantom: PhantomData,
                     }),
                 );
 
@@ -272,7 +275,7 @@ impl SegmentManifest {
 
     /// Gets a segment
     #[must_use]
-    pub fn get_segment(&self, id: SegmentId) -> Option<Arc<Segment>> {
+    pub fn get_segment(&self, id: SegmentId) -> Option<Arc<Segment<C>>> {
         self.segments
             .read()
             .expect("lock is poisoned")
@@ -294,7 +297,7 @@ impl SegmentManifest {
 
     /// Lists all segments
     #[must_use]
-    pub fn list_segments(&self) -> Vec<Arc<Segment>> {
+    pub fn list_segments(&self) -> Vec<Arc<Segment<C>>> {
         self.segments
             .read()
             .expect("lock is poisoned")

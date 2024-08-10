@@ -1,4 +1,4 @@
-use crate::{id::SegmentId, ValueHandle, ValueLog};
+use crate::{id::SegmentId, Compressor, ValueHandle, ValueLog};
 use std::{collections::BTreeMap, sync::MutexGuard};
 
 #[derive(Debug, Default)]
@@ -19,7 +19,7 @@ pub struct Scanner<'a, I: Iterator<Item = std::io::Result<(ValueHandle, u32)>>> 
 }
 
 impl<'a, I: Iterator<Item = std::io::Result<(ValueHandle, u32)>>> Scanner<'a, I> {
-    pub fn new(vlog: &'a ValueLog, iter: I) -> Self {
+    pub fn new<C: Compressor + Clone>(vlog: &'a ValueLog<C>, iter: I) -> Self {
         Self {
             iter,
             lock_guard: vlog.rollover_guard.lock().expect("lock is poisoned"),

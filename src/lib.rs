@@ -44,8 +44,20 @@
 //! # let index = MockIndex::default();
 //! # let path = folder.path();
 //! #
+//! # #[derive(Clone, Default)]
+//! # struct MyCompressor;
+//! #
+//! # impl value_log::Compressor for MyCompressor {
+//! #    fn compress(&self, bytes: &[u8]) -> value_log::Result<Vec<u8>> {
+//! #        Ok(bytes.into())
+//! #    }
+//! #
+//! #    fn decompress(&self, bytes: &[u8]) -> value_log::Result<Vec<u8>> {
+//! #        Ok(bytes.into())
+//! #    }
+//! # }
 //! // Open or recover value log from disk
-//! let value_log = ValueLog::open(path, Config::default())?;
+//! let value_log = ValueLog::open(path, Config::<MyCompressor>::default())?;
 //!
 //! // Write some data
 //! # let mut index_writer = MockIndexWriter(index.clone());
@@ -109,7 +121,7 @@ pub(crate) type HashMap<K, V> = ahash::HashMap<K, V>;
 
 pub use {
     blob_cache::BlobCache,
-    compression::{CompressError, Compressor, DecompressError},
+    compression::Compressor,
     config::Config,
     error::{Error, Result},
     handle::ValueHandle,
@@ -119,9 +131,6 @@ pub use {
     value_log::ValueLog,
     version::Version,
 };
-
-#[doc(hidden)]
-pub use config::NoCompressor;
 
 #[doc(hidden)]
 pub use segment::{reader::Reader as SegmentReader, Segment};

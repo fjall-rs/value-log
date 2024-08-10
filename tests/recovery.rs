@@ -1,5 +1,18 @@
 use test_log::test;
-use value_log::{Config, IndexWriter, MockIndex, MockIndexWriter, ValueLog};
+use value_log::{Compressor, Config, IndexWriter, MockIndex, MockIndexWriter, ValueLog};
+
+#[derive(Clone, Default)]
+struct NoCompressor;
+
+impl Compressor for NoCompressor {
+    fn compress(&self, bytes: &[u8]) -> value_log::Result<Vec<u8>> {
+        Ok(bytes.into())
+    }
+
+    fn decompress(&self, bytes: &[u8]) -> value_log::Result<Vec<u8>> {
+        Ok(bytes.into())
+    }
+}
 
 #[test]
 fn basic_recovery() -> value_log::Result<()> {
@@ -11,7 +24,7 @@ fn basic_recovery() -> value_log::Result<()> {
     let items = ["a", "b", "c", "d", "e"];
 
     {
-        let value_log = ValueLog::open(vl_path, Config::default())?;
+        let value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default())?;
 
         {
             let mut index_writer = MockIndexWriter(index.clone());
@@ -48,7 +61,7 @@ fn basic_recovery() -> value_log::Result<()> {
     }
 
     {
-        let value_log = ValueLog::open(vl_path, Config::default())?;
+        let value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default())?;
 
         value_log.scan_for_stats(index.read().unwrap().values().cloned().map(Ok))?;
 
@@ -82,12 +95,12 @@ fn delete_unfinished_segment_folders() -> value_log::Result<()> {
     assert!(mock_path.try_exists()?);
 
     {
-        let _value_log = ValueLog::open(vl_path, Config::default())?;
+        let _value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default())?;
         assert!(mock_path.try_exists()?);
     }
 
     {
-        let _value_log = ValueLog::open(vl_path, Config::default())?;
+        let _value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default())?;
         assert!(!mock_path.try_exists()?);
     }
 

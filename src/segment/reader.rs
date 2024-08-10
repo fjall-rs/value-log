@@ -5,18 +5,17 @@ use std::{
     fs::File,
     io::{BufReader, Read, Seek},
     path::Path,
-    sync::Arc,
 };
 
 /// Reads through a segment in order.
-pub struct Reader {
+pub struct Reader<C: Compressor + Clone> {
     pub(crate) segment_id: SegmentId,
     inner: BufReader<File>,
     is_terminated: bool,
-    compression: Option<Arc<dyn Compressor>>,
+    compression: Option<C>,
 }
 
-impl Reader {
+impl<C: Compressor + Clone> Reader<C> {
     /// Initializes a new segment reader.
     ///
     /// # Errors
@@ -43,13 +42,13 @@ impl Reader {
         }
     }
 
-    pub(crate) fn use_compression(mut self, compressor: Arc<dyn Compressor>) -> Self {
+    pub(crate) fn use_compression(mut self, compressor: C) -> Self {
         self.compression = Some(compressor);
         self
     }
 }
 
-impl Iterator for Reader {
+impl<C: Compressor + Clone> Iterator for Reader<C> {
     type Item = crate::Result<(UserKey, UserValue, u64)>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -119,7 +118,7 @@ impl Iterator for Reader {
         let val = match &self.compression {
             Some(compressor) => match compressor.decompress(&val) {
                 Ok(val) => val,
-                Err(e) => return Some(Err(e.into())),
+                Err(e) => return Some(Err(e)),
             },
             None => val,
         };

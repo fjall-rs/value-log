@@ -4,24 +4,21 @@ use crate::{
     id::{IdGenerator, SegmentId},
     ValueHandle,
 };
-use std::{
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::path::{Path, PathBuf};
 
 /// Segment writer, may write multiple segments
-pub struct MultiWriter {
+pub struct MultiWriter<C: Compressor + Clone> {
     folder: PathBuf,
     target_size: u64,
 
-    writers: Vec<Writer>,
+    writers: Vec<Writer<C>>,
 
     id_generator: IdGenerator,
 
-    compression: Option<Arc<dyn Compressor>>,
+    compression: Option<C>,
 }
 
-impl MultiWriter {
+impl<C: Compressor + Clone> MultiWriter<C> {
     /// Initializes a new segment writer.
     ///
     /// # Errors
@@ -52,7 +49,7 @@ impl MultiWriter {
     /// Sets the compression method
     #[must_use]
     #[doc(hidden)]
-    pub fn use_compression(mut self, compressor: Arc<dyn Compressor>) -> Self {
+    pub fn use_compression(mut self, compressor: C) -> Self {
         self.compression = Some(compressor.clone());
         self.get_active_writer_mut().compression = Some(compressor);
         self
@@ -60,13 +57,13 @@ impl MultiWriter {
 
     #[doc(hidden)]
     #[must_use]
-    pub fn get_active_writer(&self) -> &Writer {
+    pub fn get_active_writer(&self) -> &Writer<C> {
         // NOTE: initialized in constructor
         #[allow(clippy::expect_used)]
         self.writers.last().expect("should exist")
     }
 
-    fn get_active_writer_mut(&mut self) -> &mut Writer {
+    fn get_active_writer_mut(&mut self) -> &mut Writer<C> {
         // NOTE: initialized in constructor
         #[allow(clippy::expect_used)]
         self.writers.last_mut().expect("should exist")
@@ -101,11 +98,8 @@ impl MultiWriter {
         let new_segment_id = self.id_generator.next();
         let segment_path = self.folder.join(new_segment_id.to_string());
 
-        let mut new_writer = Writer::new(segment_path, new_segment_id)?;
-
-        if let Some(compressor) = &self.compression {
-            new_writer = new_writer.use_compression(compressor.clone());
-        }
+        let new_writer =
+            Writer::new(segment_path, new_segment_id)?.use_compression(self.compression.clone());
 
         self.writers.push(new_writer);
 
@@ -140,7 +134,7 @@ impl MultiWriter {
         Ok(bytes_written)
     }
 
-    pub(crate) fn finish(mut self) -> crate::Result<Vec<Writer>> {
+    pub(crate) fn finish(mut self) -> crate::Result<Vec<Writer<C>>> {
         let writer = self.get_active_writer_mut();
 
         if writer.item_count > 0 {

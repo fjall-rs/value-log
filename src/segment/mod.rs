@@ -6,15 +6,15 @@ pub mod reader;
 pub mod trailer;
 pub mod writer;
 
-use crate::id::SegmentId;
+use crate::{id::SegmentId, Compressor};
 use gc_stats::GcStats;
 use meta::Metadata;
-use std::path::PathBuf;
+use std::{marker::PhantomData, path::PathBuf};
 
 /// A disk segment is an immutable, sorted, contiguous file
 /// that contains key-value pairs.
 #[derive(Debug)]
-pub struct Segment {
+pub struct Segment<C: Compressor + Clone> {
     /// Segment ID
     pub id: SegmentId,
 
@@ -26,15 +26,17 @@ pub struct Segment {
 
     /// Runtime stats for garbage collection
     pub gc_stats: GcStats,
+
+    pub(crate) _phantom: PhantomData<C>,
 }
 
-impl Segment {
+impl<C: Compressor + Clone> Segment<C> {
     /// Returns a scanner that can iterate through the segment.
     ///
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    pub fn scan(&self) -> crate::Result<reader::Reader> {
+    pub fn scan(&self) -> crate::Result<reader::Reader<C>> {
         reader::Reader::new(&self.path, self.id)
     }
 

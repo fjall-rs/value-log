@@ -8,7 +8,7 @@ use crate::{
     segment::merge::MergeReader,
     value::UserValue,
     version::Version,
-    Config, IndexReader, SegmentReader, SegmentWriter, ValueHandle,
+    Compressor, Config, IndexReader, SegmentReader, SegmentWriter, ValueHandle,
 };
 use std::{
     fs::File,
@@ -29,10 +29,10 @@ pub fn get_next_vlog_id() -> ValueLogId {
 
 /// A disk-resident value log
 #[derive(Clone)]
-pub struct ValueLog(Arc<ValueLogInner>);
+pub struct ValueLog<C: Compressor + Clone>(Arc<ValueLogInner<C>>);
 
-impl std::ops::Deref for ValueLog {
-    type Target = ValueLogInner;
+impl<C: Compressor + Clone> std::ops::Deref for ValueLog<C> {
+    type Target = ValueLogInner<C>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -40,7 +40,7 @@ impl std::ops::Deref for ValueLog {
 }
 
 #[allow(clippy::module_name_repetitions)]
-pub struct ValueLogInner {
+pub struct ValueLogInner<C: Compressor + Clone> {
     /// Unique value log ID
     id: u64,
 
@@ -48,14 +48,14 @@ pub struct ValueLogInner {
     pub path: PathBuf,
 
     /// Value log configuration
-    config: Config,
+    config: Config<C>,
 
     /// In-memory blob cache
     blob_cache: Arc<BlobCache>,
 
     /// Segment manifest
     #[doc(hidden)]
-    pub manifest: SegmentManifest,
+    pub manifest: SegmentManifest<C>,
 
     /// Generator to get next segment ID
     id_generator: IdGenerator,
@@ -65,7 +65,7 @@ pub struct ValueLogInner {
     pub(crate) rollover_guard: Mutex<()>,
 }
 
-impl ValueLog {
+impl<C: Compressor + Clone> ValueLog<C> {
     /// Creates or recovers a value log in the given directory.
     ///
     /// # Errors
@@ -73,7 +73,7 @@ impl ValueLog {
     /// Will return `Err` if an IO error occurs.
     pub fn open<P: Into<PathBuf>>(
         path: P, // TODO: move path into config?
-        config: Config,
+        config: Config<C>,
     ) -> crate::Result<Self> {
         let path = path.into();
 
@@ -106,7 +106,7 @@ impl ValueLog {
     }
 
     /// Creates a new empty value log in a directory.
-    pub(crate) fn create_new<P: Into<PathBuf>>(path: P, config: Config) -> crate::Result<Self> {
+    pub(crate) fn create_new<P: Into<PathBuf>>(path: P, config: Config<C>) -> crate::Result<Self> {
         let path = absolute_path(path.into());
         log::trace!("Creating value-log at {}", path.display());
 
@@ -149,7 +149,7 @@ impl ValueLog {
         })))
     }
 
-    pub(crate) fn recover<P: Into<PathBuf>>(path: P, config: Config) -> crate::Result<Self> {
+    pub(crate) fn recover<P: Into<PathBuf>>(path: P, config: Config<C>) -> crate::Result<Self> {
         let path = path.into();
         log::info!("Recovering vLog at {}", path.display());
 
@@ -193,7 +193,7 @@ impl ValueLog {
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    pub fn register_writer(&self, writer: SegmentWriter) -> crate::Result<()> {
+    pub fn register_writer(&self, writer: SegmentWriter<C>) -> crate::Result<()> {
         let _lock = self.rollover_guard.lock().expect("lock is poisoned");
         self.manifest.register(writer)?;
         Ok(())
@@ -269,7 +269,7 @@ impl ValueLog {
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    pub fn get_writer(&self) -> crate::Result<SegmentWriter> {
+    pub fn get_writer(&self) -> crate::Result<SegmentWriter<C>> {
         Ok(SegmentWriter::new(
             self.id_generator.clone(),
             self.config.segment_size_bytes,
@@ -477,7 +477,7 @@ impl ValueLog {
     }
 
     #[doc(hidden)]
-    pub fn get_reader(&self) -> crate::Result<MergeReader> {
+    pub fn get_reader(&self) -> crate::Result<MergeReader<C>> {
         let segments = self.manifest.segments.read().expect("lock is poisoned");
 
         let readers = segments

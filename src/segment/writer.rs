@@ -8,13 +8,12 @@ use std::{
     fs::File,
     io::{BufWriter, Seek, Write},
     path::{Path, PathBuf},
-    sync::Arc,
 };
 
 pub const BLOB_HEADER_MAGIC: &[u8] = &[b'V', b'L', b'G', b'B', b'L', b'O', b'B', b'1'];
 
 /// Segment writer
-pub struct Writer {
+pub struct Writer<C: Compressor + Clone> {
     pub path: PathBuf,
     pub(crate) segment_id: SegmentId,
 
@@ -30,10 +29,10 @@ pub struct Writer {
     pub(crate) first_key: Option<UserKey>,
     pub(crate) last_key: Option<UserKey>,
 
-    pub(crate) compression: Option<Arc<dyn Compressor>>,
+    pub(crate) compression: Option<C>,
 }
 
-impl Writer {
+impl<C: Compressor + Clone> Writer<C> {
     /// Initializes a new segment writer.
     ///
     /// # Errors
@@ -61,8 +60,8 @@ impl Writer {
         })
     }
 
-    pub fn use_compression(mut self, compressor: Arc<dyn Compressor>) -> Self {
-        self.compression = Some(compressor);
+    pub fn use_compression(mut self, compressor: Option<C>) -> Self {
+        self.compression = compressor;
         self
     }
 
