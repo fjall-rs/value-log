@@ -539,7 +539,7 @@ impl<C: Compressor + Clone> ValueLog<C> {
 
         // IMPORTANT: We purposefully don't use compression
         // to just pipe the compressed value directly to the new blob file
-        // without having to pay (de)compressionn costs
+        // without having to pay (de)compression costs
         let reader = MergeReader::new(readers);
         let mut writer = self.get_writer()?;
 
