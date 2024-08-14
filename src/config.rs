@@ -28,6 +28,13 @@ impl<C: Compressor + Clone + Default> Default for Config<C> {
 }
 
 impl<C: Compressor + Clone> Config<C> {
+    /// Sets the compression & decompression scheme.
+    #[must_use]
+    pub fn compression(mut self, compressor: C) -> Self {
+        self.compression = compressor;
+        self
+    }
+
     /// Sets the blob cache.
     ///
     /// You can create a global [`BlobCache`] and share it between multiple
