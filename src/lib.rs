@@ -104,6 +104,7 @@ mod blob_cache;
 mod compression;
 mod config;
 mod error;
+mod gc_report;
 mod handle;
 mod id;
 mod index;
@@ -128,6 +129,7 @@ pub use {
     compression::Compressor,
     config::Config,
     error::{Error, Result},
+    gc_report::GcReport,
     handle::ValueHandle,
     index::{Reader as IndexReader, Writer as IndexWriter},
     segment::multi_writer::MultiWriter as SegmentWriter,

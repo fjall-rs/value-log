@@ -4,6 +4,7 @@
 
 use crate::{
     blob_cache::BlobCache,
+    gc_report::GcReport,
     id::{IdGenerator, SegmentId},
     index::Writer as IndexWriter,
     manifest::{SegmentManifest, SEGMENTS_FOLDER, VLOG_MARKER},
@@ -407,7 +408,18 @@ impl<C: Compressor + Clone> ValueLog<C> {
 
     #[doc(hidden)]
     #[allow(clippy::cast_precision_loss)]
-    pub fn consume_scan_result(&self, segment_ids: &[u64], size_map: &SizeMap) {
+    #[must_use]
+    pub fn consume_scan_result(&self, segment_ids: &[u64], size_map: &SizeMap) -> GcReport {
+        let mut report = GcReport {
+            path: self.path.clone(),
+            segment_count: self.segment_count(),
+            stale_segment_count: 0,
+            stale_bytes: 0,
+            total_bytes: 0,
+            stale_blobs: 0,
+            total_blobs: 0,
+        };
+
         for (&id, counter) in size_map {
             let used_size = counter.size;
             let alive_item_count = counter.item_count;
@@ -420,18 +432,13 @@ impl<C: Compressor + Clone> ValueLog<C> {
             let total_items = segment.meta.item_count;
             let stale_items = total_items - alive_item_count;
 
-            let space_amp = total_bytes as f64 / used_size as f64;
-            let stale_ratio = stale_bytes as f64 / total_bytes as f64;
-
-            log::info!(
-                "Blob file #{id} has {}/{} stale MiB ({:.1}% stale, {stale_items}/{total_items} items) - space amp: {space_amp})",
-                stale_bytes / 1_024 / 1_024,
-                total_bytes / 1_024 / 1_024,
-                stale_ratio * 100.0,
-            );
-
             segment.gc_stats.set_stale_bytes(stale_bytes);
             segment.gc_stats.set_stale_items(stale_items);
+
+            report.total_bytes += total_bytes;
+            report.stale_bytes += stale_bytes;
+            report.total_blobs += total_items;
+            report.stale_blobs += stale_items;
         }
 
         for id in segment_ids {
@@ -441,14 +448,22 @@ impl<C: Compressor + Clone> ValueLog<C> {
                 .expect("segment should exist");
 
             if !size_map.contains_key(id) {
-                log::info!(
+                log::debug!(
                     "Blob file #{id} has no incoming references - can be dropped, freeing {} KiB on disk (userdata={} MiB)",
                     segment.meta.compressed_bytes / 1_024,
                     segment.meta.total_uncompressed_bytes / 1_024/ 1_024
                 );
                 self.mark_as_stale(&[*id]);
+
+                report.stale_segment_count += 1;
+                report.total_bytes += segment.meta.total_uncompressed_bytes;
+                report.stale_bytes += segment.meta.total_uncompressed_bytes;
+                report.total_blobs += segment.meta.item_count;
+                report.stale_blobs += segment.meta.item_count;
             }
         }
+
+        report
     }
 
     /// Scans the given index and collects GC statistics.
@@ -459,25 +474,15 @@ impl<C: Compressor + Clone> ValueLog<C> {
     pub fn scan_for_stats(
         &self,
         iter: impl Iterator<Item = std::io::Result<(ValueHandle, u32)>>,
-    ) -> crate::Result<()> {
+    ) -> crate::Result<GcReport> {
         let mut scanner = Scanner::new(self, iter);
 
         let segment_ids = self.manifest.list_segment_ids();
 
         scanner.scan()?;
         let size_map = scanner.finish();
-        self.consume_scan_result(&segment_ids, &size_map);
 
-        Ok(())
-    }
-
-    /// Prints GC report.
-    pub fn print_gc_report(&self) {
-        log::info!("--- GC report for vLog @ {:?} ---", self.path);
-        log::info!("Total bytes: {}", self.manifest.total_bytes());
-        log::info!("Stale bytes: {}", self.manifest.stale_bytes());
-        log::info!("Space amp: {}", self.space_amp());
-        log::info!("--- GC report done ---");
+        Ok(self.consume_scan_result(&segment_ids, &size_map))
     }
 
     #[doc(hidden)]
