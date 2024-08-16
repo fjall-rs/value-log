@@ -350,10 +350,12 @@ impl<C: Compressor + Clone> ValueLog<C> {
 
     /// Drops stale segments.
     ///
+    /// Returns the amount of disk space (compressed data) freed.
+    ///
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    pub fn drop_stale_segments(&self) -> crate::Result<()> {
+    pub fn drop_stale_segments(&self) -> crate::Result<u64> {
         // IMPORTANT: Only allow 1 rollover or GC at any given time
         let _guard = self.rollover_guard.lock().expect("lock is poisoned");
 
@@ -367,6 +369,8 @@ impl<C: Compressor + Clone> ValueLog<C> {
             .cloned()
             .collect::<Vec<_>>();
 
+        let disk_space: u64 = segments.iter().map(|x| x.meta.compressed_bytes).sum();
+
         let ids = segments.iter().map(|x| x.id).collect::<Vec<_>>();
 
         log::info!("Dropping stale blob files: {ids:?}");
@@ -376,7 +380,7 @@ impl<C: Compressor + Clone> ValueLog<C> {
             std::fs::remove_file(&segment.path)?;
         }
 
-        Ok(())
+        Ok(disk_space)
     }
 
     /// Marks some segments as stale.
@@ -398,6 +402,7 @@ impl<C: Compressor + Clone> ValueLog<C> {
         }
     }
 
+    // TODO: remove?
     /// Returns the approximate space amplification.
     ///
     /// Returns 0.0 if there are no items.
@@ -497,18 +502,21 @@ impl<C: Compressor + Clone> ValueLog<C> {
         Ok(MergeReader::new(readers))
     }
 
+    /// Returns the amount of disk space (compressed data) freed.
     #[doc(hidden)]
     pub fn major_compact<R: IndexReader, W: IndexWriter>(
         &self,
         index_reader: &R,
         index_writer: W,
-    ) -> crate::Result<()> {
+    ) -> crate::Result<u64> {
         let ids = self.manifest.list_segment_ids();
         self.rollover(&ids, index_reader, index_writer)
     }
 
     /// Rewrites some segments into new segment(s), blocking the caller
     /// until the operation is completely done.
+    ///
+    /// Returns the amount of disk space (compressed data) freed.
     ///
     /// # Errors
     ///
@@ -518,13 +526,15 @@ impl<C: Compressor + Clone> ValueLog<C> {
         ids: &[u64],
         index_reader: &R,
         mut index_writer: W,
-    ) -> crate::Result<()> {
+    ) -> crate::Result<u64> {
         if ids.is_empty() {
-            return Ok(());
+            return Ok(0);
         }
 
         // IMPORTANT: Only allow 1 rollover or GC at any given time
         let _guard = self.rollover_guard.lock().expect("lock is poisoned");
+
+        let size_before = self.manifest.disk_space_used();
 
         log::info!("Rollover segments {ids:?}");
 
@@ -534,7 +544,7 @@ impl<C: Compressor + Clone> ValueLog<C> {
             .collect::<Option<Vec<_>>>();
 
         let Some(segments) = segments else {
-            return Ok(());
+            return Ok(0);
         };
 
         let readers = segments
@@ -577,6 +587,8 @@ impl<C: Compressor + Clone> ValueLog<C> {
         // the old segments, as some reads may still be performed
         self.mark_as_stale(ids);
 
-        Ok(())
+        let size_after = self.manifest.disk_space_used();
+
+        Ok(size_before.saturating_sub(size_after))
     }
 }
