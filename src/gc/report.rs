@@ -7,6 +7,7 @@ use std::path::PathBuf;
 /// Statistics report for garbage collection
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[allow(clippy::module_name_repetitions)]
 pub struct GcReport {
     /// Path of value log
     pub path: PathBuf,

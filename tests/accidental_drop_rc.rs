@@ -79,7 +79,7 @@ fn accidental_drop_rc() -> value_log::Result<()> {
     //
     // But we are forced to pass the list of segment IDs we saw before starting the
     // scan, which prevents marking ones as stale that were created later
-    value_log.consume_scan_result(&segment_ids, &scan_result);
+    let _ = value_log.consume_scan_result(&segment_ids, &scan_result);
 
     // IMPORTANT: The new blob file should not be dropped
     value_log.drop_stale_segments()?;

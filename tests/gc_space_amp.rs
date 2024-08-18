@@ -1,5 +1,7 @@
 use test_log::test;
-use value_log::{Compressor, Config, IndexWriter, MockIndex, MockIndexWriter, ValueLog};
+use value_log::{
+    Compressor, Config, IndexWriter, MockIndex, MockIndexWriter, SpaceAmpStrategy, ValueLog,
+};
 
 #[derive(Clone, Default)]
 struct NoCompressor;
@@ -62,8 +64,8 @@ fn gc_space_amp_target_1() -> value_log::Result<()> {
     {
         let target_space_amp = 8.0;
 
-        let ids = value_log.select_segments_for_space_amp_reduction(target_space_amp);
-        value_log.rollover(&ids, &index, MockIndexWriter(index.clone()))?;
+        let strategy = SpaceAmpStrategy::new(target_space_amp);
+        value_log.apply_gc_strategy(&strategy, &index, MockIndexWriter(index.clone()))?;
         value_log.drop_stale_segments()?;
 
         value_log.scan_for_stats(index.read().unwrap().values().cloned().map(Ok))?;
@@ -73,8 +75,8 @@ fn gc_space_amp_target_1() -> value_log::Result<()> {
     {
         let target_space_amp = 2.0;
 
-        let ids = value_log.select_segments_for_space_amp_reduction(target_space_amp);
-        value_log.rollover(&ids, &index, MockIndexWriter(index.clone()))?;
+        let strategy = SpaceAmpStrategy::new(target_space_amp);
+        value_log.apply_gc_strategy(&strategy, &index, MockIndexWriter(index.clone()))?;
         value_log.drop_stale_segments()?;
 
         value_log.scan_for_stats(index.read().unwrap().values().cloned().map(Ok))?;

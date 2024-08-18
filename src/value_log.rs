@@ -4,7 +4,7 @@
 
 use crate::{
     blob_cache::BlobCache,
-    gc_report::GcReport,
+    gc::report::GcReport,
     id::{IdGenerator, SegmentId},
     index::Writer as IndexWriter,
     manifest::{SegmentManifest, SEGMENTS_FOLDER, VLOG_MARKER},
@@ -13,7 +13,7 @@ use crate::{
     segment::merge::MergeReader,
     value::UserValue,
     version::Version,
-    Compressor, Config, IndexReader, SegmentReader, SegmentWriter, ValueHandle,
+    Compressor, Config, GcStrategy, IndexReader, SegmentReader, SegmentWriter, ValueHandle,
 };
 use std::{
     fs::File,
@@ -269,83 +269,23 @@ impl<C: Compressor + Clone> ValueLog<C> {
         Ok(Some(val))
     }
 
+    fn get_writer_raw(&self) -> crate::Result<SegmentWriter<C>> {
+        SegmentWriter::new(
+            self.id_generator.clone(),
+            self.config.segment_size_bytes,
+            self.path.join(SEGMENTS_FOLDER),
+        )
+        .map_err(Into::into)
+    }
+
     /// Initializes a new segment writer.
     ///
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
     pub fn get_writer(&self) -> crate::Result<SegmentWriter<C>> {
-        Ok(SegmentWriter::new(
-            self.id_generator.clone(),
-            self.config.segment_size_bytes,
-            self.path.join(SEGMENTS_FOLDER),
-        )?
-        .use_compression(self.config.compression.clone()))
-    }
-
-    /// Tries to find a least-effort-selection of segments to
-    /// merge to reach a certain space amplification.
-    #[must_use]
-    #[allow(clippy::cast_precision_loss, clippy::significant_drop_tightening)]
-    pub fn select_segments_for_space_amp_reduction(&self, space_amp_target: f32) -> Vec<SegmentId> {
-        let current_space_amp = self.space_amp();
-
-        if current_space_amp < space_amp_target {
-            log::trace!("Space amp is <= target {space_amp_target}, nothing to do");
-            vec![]
-        } else {
-            log::debug!("Selecting segments to GC, space_amp_target={space_amp_target}");
-
-            let lock = self.manifest.segments.read().expect("lock is poisoned");
-            let mut segments = lock.values().collect::<Vec<_>>();
-
-            // Sort by stale ratio descending
-            segments.sort_by(|a, b| {
-                b.stale_ratio()
-                    .partial_cmp(&a.stale_ratio())
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
-
-            let mut selection = vec![];
-
-            let mut total_bytes = self.manifest.total_bytes();
-            let mut stale_bytes = self.manifest.stale_bytes();
-
-            for segment in segments {
-                let segment_stale_bytes = segment.gc_stats.stale_bytes();
-                stale_bytes -= segment_stale_bytes;
-                total_bytes -= segment_stale_bytes;
-
-                selection.push(segment.id);
-
-                let space_amp_after_gc =
-                    total_bytes as f32 / (total_bytes as f32 - stale_bytes as f32);
-
-                log::debug!(
-                    "Selected segment #{} for GC: will reduce space amp to {space_amp_after_gc}",
-                    segment.id
-                );
-
-                if space_amp_after_gc <= space_amp_target {
-                    break;
-                }
-            }
-
-            selection
-        }
-    }
-
-    /// Finds segment IDs that have reached a stale threshold.
-    #[must_use]
-    pub fn find_segments_with_stale_threshold(&self, threshold: f32) -> Vec<SegmentId> {
-        self.manifest
-            .segments
-            .read()
-            .expect("lock is poisoned")
-            .values()
-            .filter(|x| x.stale_ratio() >= threshold)
-            .map(|x| x.id)
-            .collect::<Vec<_>>()
+        self.get_writer_raw()
+            .map(|x| x.use_compression(self.config.compression.clone()))
     }
 
     /// Drops stale segments.
@@ -513,6 +453,21 @@ impl<C: Compressor + Clone> ValueLog<C> {
         self.rollover(&ids, index_reader, index_writer)
     }
 
+    /// Applies a GC strategy.
+    ///
+    /// # Errors
+    ///
+    /// Will return `Err` if an IO error occurs.
+    pub fn apply_gc_strategy<R: IndexReader, W: IndexWriter>(
+        &self,
+        strategy: &impl GcStrategy<C>,
+        index_reader: &R,
+        index_writer: W,
+    ) -> crate::Result<u64> {
+        let segment_ids = strategy.pick(self);
+        self.rollover(&segment_ids, index_reader, index_writer)
+    }
+
     /// Rewrites some segments into new segment(s), blocking the caller
     /// until the operation is completely done.
     ///
@@ -521,6 +476,7 @@ impl<C: Compressor + Clone> ValueLog<C> {
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
+    #[doc(hidden)]
     pub fn rollover<R: IndexReader, W: IndexWriter>(
         &self,
         ids: &[u64],
@@ -556,7 +512,7 @@ impl<C: Compressor + Clone> ValueLog<C> {
         // to just pipe the compressed value directly to the new blob file
         // without having to pay (de)compression costs
         let reader = MergeReader::new(readers);
-        let mut writer = self.get_writer()?;
+        let mut writer = self.get_writer_raw()?;
 
         for item in reader {
             let (k, v, segment_id, _) = item?;

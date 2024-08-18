@@ -1,5 +1,7 @@
 use test_log::test;
-use value_log::{Compressor, Config, IndexWriter, MockIndex, MockIndexWriter, ValueLog};
+use value_log::{
+    Compressor, Config, IndexReader, IndexWriter, MockIndex, MockIndexWriter, ValueLog,
+};
 
 #[derive(Clone, Default)]
 struct Lz4Compressor;
@@ -26,20 +28,34 @@ fn compression() -> value_log::Result<()> {
     let mut writer = value_log.get_writer()?;
 
     let key = "abc";
-    let value = "verycompressable".repeat(1_000);
+    let value = "verycompressable".repeat(10);
 
-    let handle = writer.get_next_value_handle();
-    index_writer.insert_indirect(key.as_bytes(), handle.clone(), value.len() as u32)?;
+    {
+        let handle = writer.get_next_value_handle();
+        index_writer.insert_indirect(key.as_bytes(), handle.clone(), value.len() as u32)?;
 
-    let written_bytes = writer.write(key, &value)?;
-    assert!(written_bytes < value.len() as u32);
+        let written_bytes = writer.write(key, &value)?;
+        assert!(written_bytes < value.len() as u32);
 
-    value_log.register_writer(writer)?;
+        value_log.register_writer(writer)?;
 
-    assert_eq!(
-        &*value_log.get(&handle)?.expect("value should exist"),
-        value.as_bytes(),
-    );
+        assert_eq!(
+            &*value_log.get(&handle)?.expect("value should exist"),
+            value.as_bytes(),
+        );
+    }
+
+    {
+        let index_writer = MockIndexWriter(index.clone());
+        value_log.major_compact(&index, index_writer)?;
+
+        let handle = index.get(key.as_bytes())?.unwrap();
+
+        assert_eq!(
+            &*value_log.get(&handle)?.expect("value should exist"),
+            value.as_bytes(),
+        );
+    }
 
     Ok(())
 }
