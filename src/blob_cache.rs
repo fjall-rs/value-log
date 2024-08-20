@@ -10,9 +10,9 @@ type Item = UserValue;
 #[derive(Eq, std::hash::Hash, PartialEq)]
 pub struct CacheKey(ValueLogId, ValueHandle);
 
-impl Equivalent<CacheKey> for (ValueLogId, ValueHandle) {
+impl Equivalent<CacheKey> for (ValueLogId, &ValueHandle) {
     fn equivalent(&self, key: &CacheKey) -> bool {
-        self.0 == key.0 && self.1 == key.1
+        self.0 == key.0 && self.1 == &key.1
     }
 }
 
@@ -59,17 +59,12 @@ impl BlobCache {
     }
 
     pub(crate) fn insert(&self, key: CacheKey, value: UserValue) {
-        if self.capacity > 0 {
-            self.data.insert(key, value);
-        }
+        self.data.insert(key, value);
     }
 
-    pub(crate) fn get(&self, key: &CacheKey) -> Option<Item> {
-        if self.capacity > 0 {
-            self.data.get(key)
-        } else {
-            None
-        }
+    pub(crate) fn get(&self, vlog_id: ValueLogId, handle: &ValueHandle) -> Option<Item> {
+        let key = (vlog_id, handle);
+        self.data.get(&key)
     }
 
     /// Returns the cache capacity in bytes

@@ -229,13 +229,13 @@ impl<C: Compressor + Clone> ValueLog<C> {
         handle: &ValueHandle,
         prefetch_size: usize,
     ) -> crate::Result<Option<UserValue>> {
+        if let Some(value) = self.blob_cache.get(self.id, handle) {
+            return Ok(Some(value));
+        }
+
         let Some(segment) = self.manifest.get_segment(handle.segment_id) else {
             return Ok(None);
         };
-
-        if let Some(value) = self.blob_cache.get(&((self.id, handle.clone()).into())) {
-            return Ok(Some(value));
-        }
 
         let mut reader = BufReader::new(File::open(&segment.path)?);
         reader.seek(std::io::SeekFrom::Start(handle.offset))?;
