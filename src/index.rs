@@ -34,7 +34,7 @@ pub trait Writer {
     fn insert_indirect(
         &mut self,
         key: &[u8],
-        handle: ValueHandle,
+        vhandle: ValueHandle,
         size: u32,
     ) -> std::io::Result<()>;
 

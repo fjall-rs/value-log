@@ -36,8 +36,8 @@ fn basic_kv() -> value_log::Result<()> {
 
             let key = key.as_bytes();
 
-            let handle = writer.get_next_value_handle();
-            index_writer.insert_indirect(key, handle, value.len() as u32)?;
+            let vhandle = writer.get_next_value_handle();
+            index_writer.insert_indirect(key, vhandle, value.len() as u32)?;
 
             writer.write(key, value)?;
         }
@@ -66,8 +66,8 @@ fn basic_kv() -> value_log::Result<()> {
         );
     }
 
-    for (key, (handle, _)) in index.read().unwrap().iter() {
-        let item = value_log.get(handle)?.unwrap();
+    for (key, (vhandle, _)) in index.read().unwrap().iter() {
+        let item = value_log.get(vhandle)?.unwrap();
         assert_eq!(item, key.repeat(10_000).into());
     }
 

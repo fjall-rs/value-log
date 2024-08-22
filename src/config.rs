@@ -20,8 +20,10 @@ pub struct Config<C: Compressor + Clone> {
 impl<C: Compressor + Clone + Default> Default for Config<C> {
     fn default() -> Self {
         Self {
-            segment_size_bytes: 256 * 1_024 * 1_024,
-            blob_cache: Arc::new(BlobCache::with_capacity_bytes(16 * 1_024 * 1_024)),
+            segment_size_bytes: /* 256 MiB */ 256 * 1_024 * 1_024,
+            blob_cache: Arc::new(BlobCache::with_capacity_bytes(
+                /* 16 MiB */ 16 * 1_024 * 1_024,
+            )),
             compression: C::default(),
         }
     }

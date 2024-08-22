@@ -58,10 +58,8 @@ fn prefetch(c: &mut Criterion) {
             let start = rng.gen_range(0u64..1_999_000);
 
             for x in start..(start + range_size) {
-                let handle = index.get(&x.to_be_bytes()).unwrap().unwrap();
-
-                let value = value_log.get(&handle).unwrap().unwrap();
-
+                let vhandle = index.get(&x.to_be_bytes()).unwrap().unwrap();
+                let value = value_log.get(&vhandle).unwrap().unwrap();
                 assert_eq!(item_size, value.len());
             }
         })
@@ -72,10 +70,10 @@ fn prefetch(c: &mut Criterion) {
             let start = rng.gen_range(0u64..1_999_000);
 
             {
-                let handle = index.get(&start.to_be_bytes()).unwrap().unwrap();
+                let vhandle = index.get(&start.to_be_bytes()).unwrap().unwrap();
 
                 let value = value_log
-                    .get_with_prefetch(&handle, (range_size - 1) as usize)
+                    .get_with_prefetch(&vhandle, (range_size - 1) as usize)
                     .unwrap()
                     .unwrap();
 
@@ -83,10 +81,8 @@ fn prefetch(c: &mut Criterion) {
             }
 
             for x in (start..(start + range_size)).skip(1) {
-                let handle = index.get(&x.to_be_bytes()).unwrap().unwrap();
-
-                let value = value_log.get(&handle).unwrap().unwrap();
-
+                let vhandle = index.get(&x.to_be_bytes()).unwrap().unwrap();
+                let value = value_log.get(&vhandle).unwrap().unwrap();
                 assert_eq!(item_size, value.len());
             }
         })
@@ -149,11 +145,11 @@ fn load_value(c: &mut Criterion) {
 
         for size in sizes {
             let key = size.to_string();
-            let handle = index.get(key.as_bytes()).unwrap().unwrap();
+            let vhandle = index.get(key.as_bytes()).unwrap().unwrap();
 
             group.bench_function(format!("{size} bytes (uncached)"), |b| {
                 b.iter(|| {
-                    value_log.get(&handle).unwrap().unwrap();
+                    value_log.get(&vhandle).unwrap().unwrap();
                 })
             });
         }
@@ -198,14 +194,14 @@ fn load_value(c: &mut Criterion) {
 
         for size in sizes {
             let key = size.to_string();
-            let handle = index.get(key.as_bytes()).unwrap().unwrap();
+            let vhandle = index.get(key.as_bytes()).unwrap().unwrap();
 
             // NOTE: Warm up cache
-            value_log.get(&handle).unwrap().unwrap();
+            value_log.get(&vhandle).unwrap().unwrap();
 
             group.bench_function(format!("{size} bytes (cached)"), |b| {
                 b.iter(|| {
-                    value_log.get(&handle).unwrap().unwrap();
+                    value_log.get(&vhandle).unwrap().unwrap();
                 })
             });
         }

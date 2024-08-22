@@ -35,8 +35,8 @@ fn accidental_drop_rc() -> value_log::Result<()> {
         let mut index_writer = MockIndexWriter(index.clone());
         let mut writer = value_log.get_writer()?;
 
-        let handle = writer.get_next_value_handle();
-        index_writer.insert_indirect(key.as_bytes(), handle, value.len() as u32)?;
+        let vhandle = writer.get_next_value_handle();
+        index_writer.insert_indirect(key.as_bytes(), vhandle, value.len() as u32)?;
 
         writer.write(key.as_bytes(), value.as_bytes())?;
         value_log.register_writer(writer)?;
@@ -66,8 +66,8 @@ fn accidental_drop_rc() -> value_log::Result<()> {
         let mut index_writer = MockIndexWriter(index.clone());
         let mut writer = value_log.get_writer()?;
 
-        let handle = writer.get_next_value_handle();
-        index_writer.insert_indirect(key.as_bytes(), handle, value.len() as u32)?;
+        let vhandle = writer.get_next_value_handle();
+        index_writer.insert_indirect(key.as_bytes(), vhandle, value.len() as u32)?;
 
         writer.write(key.as_bytes(), value.as_bytes())?;
         value_log.register_writer(writer)?;

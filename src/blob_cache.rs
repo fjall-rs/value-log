@@ -17,8 +17,8 @@ impl Equivalent<CacheKey> for (ValueLogId, &ValueHandle) {
 }
 
 impl From<(ValueLogId, ValueHandle)> for CacheKey {
-    fn from((vid, handle): (ValueLogId, ValueHandle)) -> Self {
-        Self(vid, handle)
+    fn from((vid, vhandle): (ValueLogId, ValueHandle)) -> Self {
+        Self(vid, vhandle)
     }
 }
 
@@ -62,8 +62,8 @@ impl BlobCache {
         self.data.insert(key, value);
     }
 
-    pub(crate) fn get(&self, vlog_id: ValueLogId, handle: &ValueHandle) -> Option<Item> {
-        let key = (vlog_id, handle);
+    pub(crate) fn get(&self, vlog_id: ValueLogId, vhandle: &ValueHandle) -> Option<Item> {
+        let key = (vlog_id, vhandle);
         self.data.get(&key)
     }
 

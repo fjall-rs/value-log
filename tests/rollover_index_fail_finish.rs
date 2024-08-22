@@ -48,8 +48,8 @@ fn rollover_index_fail_finish() -> value_log::Result<()> {
             let value = key.repeat(10_000);
             let value = value.as_bytes();
 
-            let handle = writer.get_next_value_handle();
-            index_writer.insert_indirect(key.as_bytes(), handle, value.len() as u32)?;
+            let vhandle = writer.get_next_value_handle();
+            index_writer.insert_indirect(key.as_bytes(), vhandle, value.len() as u32)?;
 
             writer.write(key.as_bytes(), value)?;
         }

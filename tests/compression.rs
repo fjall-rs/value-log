@@ -31,8 +31,8 @@ fn compression() -> value_log::Result<()> {
     let value = "verycompressable".repeat(10);
 
     {
-        let handle = writer.get_next_value_handle();
-        index_writer.insert_indirect(key.as_bytes(), handle.clone(), value.len() as u32)?;
+        let vhandle = writer.get_next_value_handle();
+        index_writer.insert_indirect(key.as_bytes(), vhandle.clone(), value.len() as u32)?;
 
         let written_bytes = writer.write(key, &value)?;
         assert!(written_bytes < value.len() as u32);
@@ -40,7 +40,7 @@ fn compression() -> value_log::Result<()> {
         value_log.register_writer(writer)?;
 
         assert_eq!(
-            &*value_log.get(&handle)?.expect("value should exist"),
+            &*value_log.get(&vhandle)?.expect("value should exist"),
             value.as_bytes(),
         );
     }
@@ -49,10 +49,10 @@ fn compression() -> value_log::Result<()> {
         let index_writer = MockIndexWriter(index.clone());
         value_log.major_compact(&index, index_writer)?;
 
-        let handle = index.get(key.as_bytes())?.unwrap();
+        let vhandle = index.get(key.as_bytes())?.unwrap();
 
         assert_eq!(
-            &*value_log.get(&handle)?.expect("value should exist"),
+            &*value_log.get(&vhandle)?.expect("value should exist"),
             value.as_bytes(),
         );
     }

@@ -37,8 +37,8 @@ fn gc_space_amp_target_1() -> value_log::Result<()> {
         let mut index_writer = MockIndexWriter(index.clone());
         let mut writer = value_log.get_writer()?;
 
-        let handle = writer.get_next_value_handle();
-        index_writer.insert_indirect(key, handle, value.len() as u32)?;
+        let vhandle = writer.get_next_value_handle();
+        index_writer.insert_indirect(key, vhandle, value.len() as u32)?;
 
         writer.write(key, value.as_bytes())?;
 
@@ -48,8 +48,8 @@ fn gc_space_amp_target_1() -> value_log::Result<()> {
 
             let key = key.as_bytes();
 
-            let handle = writer.get_next_value_handle();
-            index_writer.insert_indirect(key, handle, value.len() as u32)?;
+            let vhandle = writer.get_next_value_handle();
+            index_writer.insert_indirect(key, vhandle, value.len() as u32)?;
 
             writer.write(key, value.as_bytes())?;
         }

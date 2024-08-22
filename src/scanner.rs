@@ -36,8 +36,8 @@ impl<'a, I: Iterator<Item = std::io::Result<(ValueHandle, u32)>>> Scanner<'a, I>
     }
 
     pub fn scan(&mut self) -> crate::Result<()> {
-        for handle in self.iter.by_ref() {
-            let (handle, size) = handle.map_err(|_| {
+        for vhandle in self.iter.by_ref() {
+            let (vhandle, size) = vhandle.map_err(|_| {
                 crate::Error::Io(std::io::Error::new(
                     std::io::ErrorKind::Other,
                     "Index returned error",
@@ -46,7 +46,7 @@ impl<'a, I: Iterator<Item = std::io::Result<(ValueHandle, u32)>>> Scanner<'a, I>
             let size = u64::from(size);
 
             self.size_map
-                .entry(handle.segment_id)
+                .entry(vhandle.segment_id)
                 .and_modify(|x| {
                     x.item_count += 1;
                     x.size += size;

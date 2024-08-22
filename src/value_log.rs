@@ -215,8 +215,8 @@ impl<C: Compressor + Clone> ValueLog<C> {
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
-    pub fn get(&self, handle: &ValueHandle) -> crate::Result<Option<UserValue>> {
-        self.get_with_prefetch(handle, 0)
+    pub fn get(&self, vhandle: &ValueHandle) -> crate::Result<Option<UserValue>> {
+        self.get_with_prefetch(vhandle, 0)
     }
 
     /// Resolves a value handle, and prefetches some values after it.
@@ -226,20 +226,20 @@ impl<C: Compressor + Clone> ValueLog<C> {
     /// Will return `Err` if an IO error occurs.
     pub fn get_with_prefetch(
         &self,
-        handle: &ValueHandle,
+        vhandle: &ValueHandle,
         prefetch_size: usize,
     ) -> crate::Result<Option<UserValue>> {
-        if let Some(value) = self.blob_cache.get(self.id, handle) {
+        if let Some(value) = self.blob_cache.get(self.id, vhandle) {
             return Ok(Some(value));
         }
 
-        let Some(segment) = self.manifest.get_segment(handle.segment_id) else {
+        let Some(segment) = self.manifest.get_segment(vhandle.segment_id) else {
             return Ok(None);
         };
 
         let mut reader = BufReader::new(File::open(&segment.path)?);
-        reader.seek(std::io::SeekFrom::Start(handle.offset))?;
-        let mut reader = SegmentReader::with_reader(handle.segment_id, reader)
+        reader.seek(std::io::SeekFrom::Start(vhandle.offset))?;
+        let mut reader = SegmentReader::with_reader(vhandle.segment_id, reader)
             .use_compression(self.config.compression.clone());
 
         let Some(item) = reader.next() else {
@@ -248,7 +248,7 @@ impl<C: Compressor + Clone> ValueLog<C> {
         let (_key, val, _checksum) = item?;
 
         self.blob_cache
-            .insert((self.id, handle.clone()).into(), val.clone());
+            .insert((self.id, vhandle.clone()).into(), val.clone());
 
         for _ in 0..prefetch_size {
             let offset = reader.get_offset()?;
@@ -259,7 +259,7 @@ impl<C: Compressor + Clone> ValueLog<C> {
             let (_key, val, _checksum) = item?;
 
             let value_handle = ValueHandle {
-                segment_id: handle.segment_id,
+                segment_id: vhandle.segment_id,
                 offset,
             };
 

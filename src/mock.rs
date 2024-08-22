@@ -36,7 +36,7 @@ impl IndexReader for MockIndex {
             .read()
             .expect("lock is poisoned")
             .get(key)
-            .map(|(handle, _)| handle)
+            .map(|(vhandle, _)| vhandle)
             .cloned())
     }
 }
