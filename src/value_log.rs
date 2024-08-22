@@ -309,18 +309,22 @@ impl<C: Compressor + Clone> ValueLog<C> {
             .cloned()
             .collect::<Vec<_>>();
 
-        let disk_space: u64 = segments.iter().map(|x| x.meta.compressed_bytes).sum();
+        let bytes_freed = segments.iter().map(|x| x.meta.compressed_bytes).sum();
 
         let ids = segments.iter().map(|x| x.id).collect::<Vec<_>>();
 
-        log::info!("Dropping stale blob files: {ids:?}");
-        self.manifest.drop_segments(&ids)?;
+        if ids.is_empty() {
+            log::trace!("No blob files to drop");
+        } else {
+            log::info!("Dropping stale blob files: {ids:?}");
+            self.manifest.drop_segments(&ids)?;
 
-        for segment in segments {
-            std::fs::remove_file(&segment.path)?;
+            for segment in segments {
+                std::fs::remove_file(&segment.path)?;
+            }
         }
 
-        Ok(disk_space)
+        Ok(bytes_freed)
     }
 
     /// Marks some segments as stale.
