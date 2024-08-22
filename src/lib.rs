@@ -122,7 +122,7 @@ mod value;
 mod value_log;
 mod version;
 
-pub(crate) type HashMap<K, V> = ahash::HashMap<K, V>;
+pub(crate) type HashMap<K, V> = std::collections::HashMap<K, V, xxhash_rust::xxh3::Xxh3Builder>;
 
 pub use {
     blob_cache::BlobCache,

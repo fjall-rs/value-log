@@ -38,7 +38,7 @@ impl Weighter<CacheKey, Item> for BlobWeighter {
 /// This speeds up consecutive accesses to the same blobs, improving
 /// read performance for hot data.
 pub struct BlobCache {
-    data: Cache<CacheKey, Item, BlobWeighter>,
+    data: Cache<CacheKey, Item, BlobWeighter, xxhash_rust::xxh3::Xxh3Builder>,
     capacity: u64,
 }
 
@@ -52,8 +52,16 @@ impl BlobCache {
     /// Creates a new block cache with roughly `n` bytes of capacity
     #[must_use]
     pub fn with_capacity_bytes(bytes: u64) -> Self {
+        use quick_cache::sync::DefaultLifecycle;
+
         Self {
-            data: Cache::with_weighter(10_000, bytes, BlobWeighter),
+            data: Cache::with(
+                10_000,
+                bytes,
+                BlobWeighter,
+                xxhash_rust::xxh3::Xxh3Builder::new(),
+                DefaultLifecycle::default(),
+            ),
             capacity: bytes,
         }
     }

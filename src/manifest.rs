@@ -117,9 +117,8 @@ impl<C: Compressor + Clone> SegmentManifest<C> {
         Self::remove_unfinished_segments(&segments_folder, &ids)?;
 
         let segments = {
-            use ahash::HashMapExt;
-
-            let mut map = HashMap::with_capacity(100);
+            let mut map =
+                HashMap::with_capacity_and_hasher(100, xxhash_rust::xxh3::Xxh3Builder::new());
 
             for id in ids {
                 log::trace!("Recovering segment #{id:?}");
