@@ -111,3 +111,47 @@ impl<const N: usize> From<[u8; N]> for Slice {
         Self::from(value.as_slice())
     }
 }
+
+#[cfg(feature = "serde")]
+mod serde {
+    use super::Slice;
+    use serde::de::{self, Visitor};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::fmt;
+    use std::ops::Deref;
+
+    impl Serialize for Slice {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            serializer.serialize_bytes(self.deref())
+        }
+    }
+
+    impl<'de> Deserialize<'de> for Slice {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            struct SliceVisitor;
+
+            impl<'de> Visitor<'de> for SliceVisitor {
+                type Value = Slice;
+
+                fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                    formatter.write_str("a byte array")
+                }
+
+                fn visit_bytes<E>(self, v: &[u8]) -> Result<Slice, E>
+                where
+                    E: de::Error,
+                {
+                    Ok(Slice::from(v))
+                }
+            }
+
+            deserializer.deserialize_bytes(SliceVisitor)
+        }
+    }
+}
