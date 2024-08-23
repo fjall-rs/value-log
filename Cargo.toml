@@ -12,8 +12,6 @@ homepage = "https://github.com/fjall-rs/value-log"
 keywords = ["database", "blobdb", "lsm", "wisckey", "key-value"]
 categories = ["data-structures", "database-implementations", "algorithms"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [lib]
 name = "value_log"
 path = "src/lib.rs"

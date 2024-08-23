@@ -1,6 +1,7 @@
-use std::sync::Arc;
 use test_log::test;
-use value_log::{Compressor, Config, IndexWriter, KeyRange, MockIndex, MockIndexWriter, ValueLog};
+use value_log::{
+    Compressor, Config, IndexWriter, KeyRange, MockIndex, MockIndexWriter, Slice, ValueLog,
+};
 
 #[derive(Clone, Default)]
 struct NoCompressor;
@@ -57,7 +58,7 @@ fn basic_kv() -> value_log::Result<()> {
 
         assert_eq!(
             segment.meta.key_range,
-            KeyRange::new((Arc::new(*b"a"), Arc::new(*b"e")))
+            KeyRange::new((Slice::from(*b"a"), Slice::from(*b"e")))
         );
 
         assert_eq!(
@@ -68,7 +69,7 @@ fn basic_kv() -> value_log::Result<()> {
 
     for (key, (vhandle, _)) in index.read().unwrap().iter() {
         let item = value_log.get(vhandle)?.unwrap();
-        assert_eq!(item, key.repeat(10_000).into());
+        assert_eq!(&*item, &*key.repeat(10_000));
     }
 
     Ok(())

@@ -112,6 +112,7 @@ mod key_range;
 mod manifest;
 mod mock;
 mod path;
+mod slice;
 
 #[doc(hidden)]
 pub mod scanner;
@@ -134,6 +135,7 @@ pub use {
     handle::ValueHandle,
     index::{Reader as IndexReader, Writer as IndexWriter},
     segment::multi_writer::MultiWriter as SegmentWriter,
+    slice::Slice,
     value::{UserKey, UserValue},
     value_log::ValueLog,
     version::Version,

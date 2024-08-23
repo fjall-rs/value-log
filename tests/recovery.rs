@@ -56,7 +56,7 @@ fn basic_recovery() -> value_log::Result<()> {
 
         for (key, (vhandle, _)) in index.read().unwrap().iter() {
             let item = value_log.get(vhandle)?.unwrap();
-            assert_eq!(item, key.repeat(10_000).into());
+            assert_eq!(&*item, &*key.repeat(10_000));
         }
     }
 
@@ -76,7 +76,7 @@ fn basic_recovery() -> value_log::Result<()> {
 
         for (key, (vhandle, _)) in index.read().unwrap().iter() {
             let item = value_log.get(vhandle)?.unwrap();
-            assert_eq!(item, key.repeat(10_000).into());
+            assert_eq!(&*item, &*key.repeat(10_000));
         }
     }
 

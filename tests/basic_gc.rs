@@ -55,7 +55,7 @@ fn basic_gc() -> value_log::Result<()> {
 
     for (key, (vhandle, _)) in index.read().unwrap().iter() {
         let item = value_log.get(vhandle)?.unwrap();
-        assert_eq!(item, key.repeat(10_000).into());
+        assert_eq!(&*item, &*key.repeat(10_000));
     }
 
     {
@@ -90,7 +90,7 @@ fn basic_gc() -> value_log::Result<()> {
 
     for (key, (vhandle, _)) in index.read().unwrap().iter() {
         let item = value_log.get(vhandle)?.unwrap();
-        assert_eq!(item, key.repeat(10_000).into());
+        assert_eq!(&*item, &*key.repeat(10_000));
     }
 
     value_log.major_compact(&index, MockIndexWriter(index.clone()))?;
