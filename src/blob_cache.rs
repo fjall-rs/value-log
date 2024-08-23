@@ -81,6 +81,12 @@ impl BlobCache {
         self.capacity
     }
 
+    /// Returns the size in bytes
+    #[must_use]
+    pub fn size(&self) -> u64 {
+        self.data.weight()
+    }
+
     /// Returns the number of cached blocks
     #[must_use]
     pub fn len(&self) -> usize {
