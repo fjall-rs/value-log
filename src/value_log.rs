@@ -89,6 +89,26 @@ impl<C: Compressor + Clone> ValueLog<C> {
         }
     }
 
+    /* /// Prints fragmentation histogram.
+    pub fn print_fragmentation_histogram(&self) {
+        let lock = self.manifest.segments.read().expect("lock is poisoned");
+
+        for (id, segment) in &*lock {
+            let stale_ratio = segment.stale_ratio();
+
+            let progress = (stale_ratio * 10.0) as usize;
+            let void = 10 - progress;
+
+            let progress = "=".repeat(progress);
+            let void = " ".repeat(void);
+
+            println!(
+                "{id:0>4} [{progress}{void}] {}%",
+                (stale_ratio * 100.0) as usize
+            );
+        }
+    } */
+
     #[doc(hidden)]
     pub fn verify(&self) -> crate::Result<usize> {
         let _lock = self.rollover_guard.lock().expect("lock is poisoned");
