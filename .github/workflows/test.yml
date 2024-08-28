@@ -49,7 +49,7 @@ jobs:
         env:
           RUST_LOG: debug
   cross:
-    timeout-minutes: 20
+    timeout-minutes: 10
     name: cross
     strategy:
       matrix:
