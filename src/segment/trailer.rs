@@ -3,7 +3,7 @@
 // (found in the LICENSE-* files in the repository)
 
 use super::meta::Metadata;
-use crate::serde::{Deserializable, DeserializeError, Serializable, SerializeError};
+use crate::coding::{Decode, DecodeError, Encode, EncodeError};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::{
     fs::File,
@@ -39,14 +39,14 @@ impl SegmentFileTrailer {
         reader.read_exact(&mut magic)?;
 
         if magic != TRAILER_MAGIC {
-            return Err(crate::Error::Deserialize(DeserializeError::InvalidHeader(
+            return Err(crate::Error::Decode(DecodeError::InvalidHeader(
                 "SegmentTrailer",
             )));
         }
 
         // Jump to metadata and parse
         reader.seek(std::io::SeekFrom::Start(metadata_ptr))?;
-        let metadata = Metadata::deserialize(&mut reader)?;
+        let metadata = Metadata::decode_from(&mut reader)?;
 
         Ok(Self {
             metadata,
@@ -55,8 +55,8 @@ impl SegmentFileTrailer {
     }
 }
 
-impl Serializable for SegmentFileTrailer {
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializeError> {
+impl Encode for SegmentFileTrailer {
+    fn encode_into<W: Write>(&self, writer: &mut W) -> Result<(), EncodeError> {
         let mut v = Vec::with_capacity(TRAILER_SIZE);
 
         v.write_u64::<BigEndian>(self.metadata_ptr)?;

@@ -3,8 +3,8 @@
 // (found in the LICENSE-* files in the repository)
 
 use crate::{
+    coding::{Decode, DecodeError, Encode, EncodeError},
     key_range::KeyRange,
-    serde::{Deserializable, DeserializeError, Serializable, SerializeError},
 };
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::io::{Read, Write};
@@ -27,8 +27,8 @@ pub struct Metadata {
     pub key_range: KeyRange,
 }
 
-impl Serializable for Metadata {
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializeError> {
+impl Encode for Metadata {
+    fn encode_into<W: Write>(&self, writer: &mut W) -> Result<(), EncodeError> {
         // Write header
         writer.write_all(METADATA_HEADER_MAGIC)?;
 
@@ -36,27 +36,27 @@ impl Serializable for Metadata {
         writer.write_u64::<BigEndian>(self.compressed_bytes)?;
         writer.write_u64::<BigEndian>(self.total_uncompressed_bytes)?;
 
-        self.key_range.serialize(writer)?;
+        self.key_range.encode_into(writer)?;
 
         Ok(())
     }
 }
 
-impl Deserializable for Metadata {
-    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, DeserializeError> {
+impl Decode for Metadata {
+    fn decode_from<R: Read>(reader: &mut R) -> Result<Self, DecodeError> {
         // Check header
         let mut magic = [0u8; METADATA_HEADER_MAGIC.len()];
         reader.read_exact(&mut magic)?;
 
         if magic != METADATA_HEADER_MAGIC {
-            return Err(DeserializeError::InvalidHeader("SegmentMetadata"));
+            return Err(DecodeError::InvalidHeader("SegmentMetadata"));
         }
 
         let item_count = reader.read_u64::<BigEndian>()?;
         let compressed_bytes = reader.read_u64::<BigEndian>()?;
         let total_uncompressed_bytes = reader.read_u64::<BigEndian>()?;
 
-        let key_range = KeyRange::deserialize(reader)?;
+        let key_range = KeyRange::decode_from(reader)?;
 
         Ok(Self {
             item_count,

@@ -3,7 +3,7 @@
 // (found in the LICENSE-* files in the repository)
 
 use super::{meta::METADATA_HEADER_MAGIC, writer::BLOB_HEADER_MAGIC};
-use crate::{id::SegmentId, value::UserKey, Compressor, UserValue};
+use crate::{coding::DecodeError, id::SegmentId, value::UserKey, Compressor, UserValue};
 use byteorder::{BigEndian, ReadBytesExt};
 use std::{
     fs::File,
@@ -73,9 +73,9 @@ impl<C: Compressor + Clone> Iterator for Reader<C> {
             }
 
             if buf != BLOB_HEADER_MAGIC {
-                return Some(Err(crate::Error::Deserialize(
-                    crate::serde::DeserializeError::InvalidHeader("Blob"),
-                )));
+                return Some(Err(crate::Error::Decode(DecodeError::InvalidHeader(
+                    "Blob",
+                ))));
             }
         }
 

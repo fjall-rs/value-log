@@ -101,6 +101,7 @@
 #![warn(clippy::multiple_crate_versions)]
 
 mod blob_cache;
+mod coding;
 mod compression;
 mod config;
 mod error;
@@ -118,7 +119,6 @@ mod slice;
 pub mod scanner;
 
 mod segment;
-mod serde;
 mod value;
 mod value_log;
 mod version;

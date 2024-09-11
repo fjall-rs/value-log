@@ -4,8 +4,7 @@
 
 use super::{meta::Metadata, trailer::SegmentFileTrailer};
 use crate::{
-    compression::Compressor, id::SegmentId, key_range::KeyRange, serde::Serializable,
-    value::UserKey,
+    coding::Encode, compression::Compressor, id::SegmentId, key_range::KeyRange, value::UserKey,
 };
 use byteorder::{BigEndian, WriteBytesExt};
 use std::{
@@ -176,13 +175,13 @@ impl<C: Compressor + Clone> Writer<C> {
                     .expect("should have written at least 1 item"),
             )),
         };
-        metadata.serialize(&mut self.active_writer)?;
+        metadata.encode_into(&mut self.active_writer)?;
 
         SegmentFileTrailer {
             metadata,
             metadata_ptr,
         }
-        .serialize(&mut self.active_writer)?;
+        .encode_into(&mut self.active_writer)?;
 
         self.active_writer.flush()?;
         self.active_writer.get_mut().sync_all()?;

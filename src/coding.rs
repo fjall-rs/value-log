@@ -6,14 +6,14 @@ use std::io::{Read, Write};
 
 /// Error during serialization
 #[derive(Debug)]
-pub enum SerializeError {
+pub enum EncodeError {
     /// I/O error
     Io(std::io::Error),
 }
 
 /// Error during deserialization
 #[derive(Debug)]
-pub enum DeserializeError {
+pub enum DecodeError {
     /// I/O error
     Io(std::io::Error),
 
@@ -26,28 +26,35 @@ pub enum DeserializeError {
     InvalidHeader(&'static str),
 }
 
-impl From<std::io::Error> for SerializeError {
+impl From<std::io::Error> for EncodeError {
     fn from(value: std::io::Error) -> Self {
         Self::Io(value)
     }
 }
 
-impl From<std::io::Error> for DeserializeError {
+impl From<std::io::Error> for DecodeError {
     fn from(value: std::io::Error) -> Self {
         Self::Io(value)
     }
 }
 
 /// Trait to serialize stuff
-pub trait Serializable {
-    /// Serialize to bytes
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializeError>;
+pub trait Encode {
+    /// Serializes into writer.
+    fn encode_into<W: Write>(&self, writer: &mut W) -> Result<(), EncodeError>;
+
+    /// Serializes into vector.
+    fn encode_into_vec(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut v = vec![];
+        self.encode_into(&mut v)?;
+        Ok(v)
+    }
 }
 
 /// Trait to deserialize stuff
-pub trait Deserializable {
-    /// Deserialize from bytes
-    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, DeserializeError>
+pub trait Decode {
+    /// Deserializes from reader.
+    fn decode_from<R: Read>(reader: &mut R) -> Result<Self, DecodeError>
     where
         Self: Sized;
 }

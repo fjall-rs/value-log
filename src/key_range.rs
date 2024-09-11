@@ -3,7 +3,7 @@
 // (found in the LICENSE-* files in the repository)
 
 use crate::{
-    serde::{Deserializable, DeserializeError, Serializable, SerializeError},
+    coding::{Decode, DecodeError, Encode, EncodeError},
     value::UserKey,
     Slice,
 };
@@ -34,8 +34,8 @@ impl KeyRange {
     }
 }
 
-impl Serializable for KeyRange {
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializeError> {
+impl Encode for KeyRange {
+    fn encode_into<W: Write>(&self, writer: &mut W) -> Result<(), EncodeError> {
         // NOTE: Max key size = u16
         #[allow(clippy::cast_possible_truncation)]
         writer.write_u16::<BigEndian>(self.deref().0.len() as u16)?;
@@ -50,8 +50,8 @@ impl Serializable for KeyRange {
     }
 }
 
-impl Deserializable for KeyRange {
-    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, DeserializeError> {
+impl Decode for KeyRange {
+    fn decode_from<R: Read>(reader: &mut R) -> Result<Self, DecodeError> {
         let key_min_len = reader.read_u16::<BigEndian>()?;
         let mut key_min = vec![0; key_min_len.into()];
         reader.read_exact(&mut key_min)?;
