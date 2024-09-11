@@ -13,7 +13,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub const BLOB_HEADER_MAGIC: &[u8] = &[b'V', b'L', b'G', b'B', b'L', b'O', b'B', b'1'];
+pub const BLOB_HEADER_MAGIC: &[u8] = &[b'V', b'L', b'G', b'B', b'L', b'O', b'B', 1];
 
 /// Segment writer
 pub struct Writer<C: Compressor + Clone> {
