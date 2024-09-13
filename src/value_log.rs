@@ -399,7 +399,7 @@ impl<C: Compressor + Clone> ValueLog<C> {
             report.total_bytes += total_bytes;
             report.total_blobs += total_items;
 
-            if size_map.contains_key(&id) {
+            if counter.item_count > 0 {
                 let used_size = counter.size;
                 let alive_item_count = counter.item_count;
 
@@ -417,13 +417,13 @@ impl<C: Compressor + Clone> ValueLog<C> {
                 log::debug!(
                 "Blob file #{id} has no incoming references - can be dropped, freeing {} KiB on disk (userdata={} MiB)",
                 segment.meta.compressed_bytes / 1_024,
-                segment.meta.total_uncompressed_bytes / 1_024/ 1_024
+                total_bytes / 1_024/ 1_024
             );
                 self.mark_as_stale(&[id]);
 
                 report.stale_segment_count += 1;
-                report.stale_bytes += segment.meta.total_uncompressed_bytes;
-                report.stale_blobs += segment.meta.item_count;
+                report.stale_bytes += total_bytes;
+                report.stale_blobs += total_items;
             }
         }
 
