@@ -67,7 +67,8 @@ pub struct ValueLogInner<C: Compressor + Clone> {
 
     /// Guards the rollover (compaction) process to only
     /// allow one to happen at a time
-    pub(crate) rollover_guard: Mutex<()>,
+    #[doc(hidden)]
+    pub rollover_guard: Mutex<()>,
 }
 
 impl<C: Compressor + Clone> ValueLog<C> {
@@ -378,7 +379,7 @@ impl<C: Compressor + Clone> ValueLog<C> {
     #[doc(hidden)]
     #[allow(clippy::cast_precision_loss)]
     #[must_use]
-    pub fn consume_scan_result(&self, segment_ids: &[u64], size_map: &SizeMap) -> GcReport {
+    pub fn consume_scan_result(&self, size_map: &SizeMap) -> GcReport {
         let mut report = GcReport {
             path: self.path.clone(),
             segment_count: self.segment_count(),
@@ -390,44 +391,39 @@ impl<C: Compressor + Clone> ValueLog<C> {
         };
 
         for (&id, counter) in size_map {
-            let used_size = counter.size;
-            let alive_item_count = counter.item_count;
-
             let segment = self.manifest.get_segment(id).expect("segment should exist");
 
             let total_bytes = segment.meta.total_uncompressed_bytes;
-            let stale_bytes = total_bytes - used_size;
-
             let total_items = segment.meta.item_count;
-            let stale_items = total_items - alive_item_count;
-
-            segment.gc_stats.set_stale_bytes(stale_bytes);
-            segment.gc_stats.set_stale_items(stale_items);
 
             report.total_bytes += total_bytes;
-            report.stale_bytes += stale_bytes;
             report.total_blobs += total_items;
-            report.stale_blobs += stale_items;
-        }
 
-        for id in segment_ids {
-            let segment = self
-                .manifest
-                .get_segment(*id)
-                .expect("segment should exist");
+            if size_map.contains_key(&id) {
+                let used_size = counter.size;
+                let alive_item_count = counter.item_count;
 
-            if !size_map.contains_key(id) {
+                let segment = self.manifest.get_segment(id).expect("segment should exist");
+
+                let stale_bytes = total_bytes - used_size;
+
+                let stale_items = total_items - alive_item_count;
+
+                segment.gc_stats.set_stale_bytes(stale_bytes);
+                segment.gc_stats.set_stale_items(stale_items);
+
+                report.stale_bytes += stale_bytes;
+                report.stale_blobs += stale_items;
+            } else {
                 log::debug!(
-                    "Blob file #{id} has no incoming references - can be dropped, freeing {} KiB on disk (userdata={} MiB)",
-                    segment.meta.compressed_bytes / 1_024,
-                    segment.meta.total_uncompressed_bytes / 1_024/ 1_024
-                );
-                self.mark_as_stale(&[*id]);
+                "Blob file #{id} has no incoming references - can be dropped, freeing {} KiB on disk (userdata={} MiB)",
+                segment.meta.compressed_bytes / 1_024,
+                segment.meta.total_uncompressed_bytes / 1_024/ 1_024
+            );
+                self.mark_as_stale(&[id]);
 
                 report.stale_segment_count += 1;
-                report.total_bytes += segment.meta.total_uncompressed_bytes;
                 report.stale_bytes += segment.meta.total_uncompressed_bytes;
-                report.total_blobs += segment.meta.item_count;
                 report.stale_blobs += segment.meta.item_count;
             }
         }
@@ -444,14 +440,15 @@ impl<C: Compressor + Clone> ValueLog<C> {
         &self,
         iter: impl Iterator<Item = std::io::Result<(ValueHandle, u32)>>,
     ) -> crate::Result<GcReport> {
-        let mut scanner = Scanner::new(self, iter);
+        let lock_guard = self.rollover_guard.lock().expect("lock is poisoned");
 
-        let segment_ids = self.manifest.list_segment_ids();
-
+        let ids = self.manifest.list_segment_ids();
+        let mut scanner = Scanner::new(iter, lock_guard, &ids);
         scanner.scan()?;
         let size_map = scanner.finish();
+        let report = self.consume_scan_result(&size_map);
 
-        Ok(self.consume_scan_result(&segment_ids, &size_map))
+        Ok(report)
     }
 
     #[doc(hidden)]
