@@ -406,7 +406,6 @@ impl<C: Compressor + Clone> ValueLog<C> {
                 let segment = self.manifest.get_segment(id).expect("segment should exist");
 
                 let stale_bytes = total_bytes - used_size;
-
                 let stale_items = total_items - alive_item_count;
 
                 segment.gc_stats.set_stale_bytes(stale_bytes);
