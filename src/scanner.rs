@@ -13,6 +13,7 @@ pub struct SegmentCounter {
 
 pub type SizeMap = BTreeMap<SegmentId, SegmentCounter>;
 
+/// Scans a value log, building a size map for the GC report
 pub struct Scanner<'a, I: Iterator<Item = std::io::Result<(ValueHandle, u32)>>> {
     iter: I,
 

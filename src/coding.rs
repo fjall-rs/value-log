@@ -44,6 +44,7 @@ pub trait Encode {
     fn encode_into<W: Write>(&self, writer: &mut W) -> Result<(), EncodeError>;
 
     /// Serializes into vector.
+    #[allow(unused)]
     fn encode_into_vec(&self) -> Result<Vec<u8>, EncodeError> {
         let mut v = vec![];
         self.encode_into(&mut v)?;

@@ -67,6 +67,8 @@ impl<C: Compressor + Clone> Segment<C> {
         self.gc_stats.stale_items() == self.meta.item_count
     }
 
+    // NOTE: Precision is not important here
+    #[allow(clippy::cast_precision_loss)]
     /// Returns the percent of dead items in the segment.
     pub fn stale_ratio(&self) -> f32 {
         let dead = self.gc_stats.stale_items() as f32;

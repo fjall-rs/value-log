@@ -545,6 +545,9 @@ impl<C: Compressor + Clone> ValueLog<C> {
             }
 
             let vhandle = writer.get_next_value_handle();
+
+            // NOTE: Truncation is OK because we know values are u32 max
+            #[allow(clippy::cast_possible_truncation)]
             index_writer.insert_indirect(&k, vhandle, v.len() as u32)?;
 
             writer.write(&k, &v)?;
