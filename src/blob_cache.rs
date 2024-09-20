@@ -38,7 +38,7 @@ impl Weighter<CacheKey, Item> for BlobWeighter {
 /// This speeds up consecutive accesses to the same blobs, improving
 /// read performance for hot data.
 pub struct BlobCache {
-    data: Cache<CacheKey, Item, BlobWeighter, xxhash_rust::xxh3::Xxh3Builder>,
+    data: Cache<CacheKey, Item, BlobWeighter>,
     capacity: u64,
 }
 
@@ -49,19 +49,22 @@ impl std::fmt::Debug for BlobCache {
 }
 
 impl BlobCache {
-    /// Creates a new block cache with roughly `n` bytes of capacity
+    /// Creates a new block cache with roughly `n` bytes of capacity.
     #[must_use]
     pub fn with_capacity_bytes(bytes: u64) -> Self {
         use quick_cache::sync::DefaultLifecycle;
 
+        #[allow(clippy::default_trait_access)]
+        let quick_cache = Cache::with(
+            10_000,
+            bytes,
+            BlobWeighter,
+            Default::default(),
+            DefaultLifecycle::default(),
+        );
+
         Self {
-            data: Cache::with(
-                10_000,
-                bytes,
-                BlobWeighter,
-                xxhash_rust::xxh3::Xxh3Builder::new(),
-                DefaultLifecycle::default(),
-            ),
+            data: quick_cache,
             capacity: bytes,
         }
     }
@@ -71,29 +74,28 @@ impl BlobCache {
     }
 
     pub(crate) fn get(&self, vlog_id: ValueLogId, vhandle: &ValueHandle) -> Option<Item> {
-        let key = (vlog_id, vhandle);
-        self.data.get(&key)
+        self.data.get(&(vlog_id, vhandle))
     }
 
-    /// Returns the cache capacity in bytes
+    /// Returns the cache capacity in bytes.
     #[must_use]
     pub fn capacity(&self) -> u64 {
         self.capacity
     }
 
-    /// Returns the size in bytes
+    /// Returns the size in bytes.
     #[must_use]
     pub fn size(&self) -> u64 {
         self.data.weight()
     }
 
-    /// Returns the number of cached blocks
+    /// Returns the number of cached blocks.
     #[must_use]
     pub fn len(&self) -> usize {
         self.data.len()
     }
 
-    /// Returns `true` if there are no cached blocks
+    /// Returns `true` if there are no cached blocks.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
