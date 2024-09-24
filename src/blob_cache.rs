@@ -38,7 +38,11 @@ impl Weighter<CacheKey, Item> for BlobWeighter {
 /// This speeds up consecutive accesses to the same blobs, improving
 /// read performance for hot data.
 pub struct BlobCache {
-    data: Cache<CacheKey, Item, BlobWeighter>,
+    // NOTE: rustc_hash performed best: https://fjall-rs.github.io/post/fjall-2-1
+    /// Concurrent cache implementation
+    data: Cache<CacheKey, Item, BlobWeighter, rustc_hash::FxBuildHasher>,
+
+    /// Capacity in bytes
     capacity: u64,
 }
 
