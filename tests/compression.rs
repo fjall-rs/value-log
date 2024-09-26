@@ -3,7 +3,7 @@ use value_log::{
     Compressor, Config, IndexReader, IndexWriter, MockIndex, MockIndexWriter, ValueLog,
 };
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 struct Lz4Compressor;
 impl Compressor for Lz4Compressor {
     fn compress(&self, bytes: &[u8]) -> value_log::Result<Vec<u8>> {
@@ -46,8 +46,17 @@ fn compression() -> value_log::Result<()> {
     }
 
     {
+        let segments = value_log.manifest.list_segments();
+        let segment = segments.first().unwrap();
+        assert_eq!(segment.meta.compressed_bytes, 32);
+        assert_eq!(segment.meta.total_uncompressed_bytes, value.len() as u64);
+    }
+
+    {
         let index_writer = MockIndexWriter(index.clone());
-        value_log.major_compact(&index, index_writer)?;
+        let bytes_saved = value_log.major_compact(&index, index_writer)?;
+
+        assert_eq!(0, bytes_saved);
 
         let vhandle = index.get(key.as_bytes())?.unwrap();
 
@@ -55,6 +64,13 @@ fn compression() -> value_log::Result<()> {
             &*value_log.get(&vhandle)?.expect("value should exist"),
             value.as_bytes(),
         );
+    }
+
+    {
+        let segments = value_log.manifest.list_segments();
+        let segment = segments.first().unwrap();
+        assert_eq!(segment.meta.compressed_bytes, 32);
+        assert_eq!(segment.meta.total_uncompressed_bytes, value.len() as u64);
     }
 
     Ok(())
