@@ -528,9 +528,10 @@ impl<C: Compressor + Clone> ValueLog<C> {
             .map(|x| x.scan())
             .collect::<crate::Result<Vec<_>>>()?;
 
-        // IMPORTANT: We purposefully don't use compression
-        // to just pipe the compressed value directly to the new blob file
-        // without having to pay (de)compression costs
+        // TODO: 2.0.0: Store uncompressed size per blob
+        // so we can avoid recompression costs during GC
+        // but have stats be correct
+
         let reader = MergeReader::new(
             readers
                 .into_iter()
