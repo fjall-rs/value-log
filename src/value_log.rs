@@ -531,8 +531,16 @@ impl<C: Compressor + Clone> ValueLog<C> {
         // IMPORTANT: We purposefully don't use compression
         // to just pipe the compressed value directly to the new blob file
         // without having to pay (de)compression costs
-        let reader = MergeReader::new(readers);
-        let mut writer = self.get_writer_raw()?;
+        let reader = MergeReader::new(
+            readers
+                .into_iter()
+                .map(|x| x.use_compression(self.config.compression.clone()))
+                .collect(),
+        );
+
+        let mut writer = self
+            .get_writer_raw()?
+            .use_compression(self.config.compression.clone());
 
         for item in reader {
             let (k, v, segment_id, _) = item?;

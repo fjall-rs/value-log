@@ -55,6 +55,7 @@ fn compression() -> value_log::Result<()> {
     {
         let index_writer = MockIndexWriter(index.clone());
         let bytes_saved = value_log.major_compact(&index, index_writer)?;
+        value_log.drop_stale_segments()?;
 
         assert_eq!(0, bytes_saved);
 
