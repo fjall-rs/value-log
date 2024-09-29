@@ -113,6 +113,11 @@ impl<C: Compressor + Clone> Writer<C> {
         hasher.update(&value);
         let checksum = hasher.digest();
 
+        // TODO: 2.0.0 formalize blob header
+        // into struct... store uncompressed len as well
+        // so we can optimize rollover by avoiding
+        // repeated compression & decompression
+
         // Write header
         self.active_writer.write_all(BLOB_HEADER_MAGIC)?;
 
