@@ -2,18 +2,24 @@
 // This source code is licensed under both the Apache 2.0 and MIT License
 // (found in the LICENSE-* files in the repository)
 
-use std::hash::Hash;
-use std::sync::Arc;
+use byteview::ByteView;
+use std::{hash::Hash, sync::Arc};
 
 /// An immutable byte slice that can be cloned without additional heap allocation
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
-pub struct Slice(Arc<[u8]>);
+pub struct Slice(ByteView);
 
 impl Slice {
     /// Construct a [`Slice`] from a byte slice.
     #[must_use]
     pub fn new(bytes: &[u8]) -> Self {
         Self::from(bytes)
+    }
+
+    #[doc(hidden)]
+    #[must_use]
+    pub fn slice(&self, range: impl std::ops::RangeBounds<usize>) -> Self {
+        Self(self.0.slice(range))
     }
 }
 
@@ -78,7 +84,7 @@ impl From<&[u8]> for Slice {
 
 impl From<Arc<[u8]>> for Slice {
     fn from(value: Arc<[u8]>) -> Self {
-        Self(value)
+        Self(ByteView::from(value))
     }
 }
 
