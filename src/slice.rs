@@ -3,7 +3,7 @@
 // (found in the LICENSE-* files in the repository)
 
 use std::hash::Hash;
-use std::sync::Arc;
+use triomphe::Arc;
 
 /// An immutable byte slice that can be cloned without additional heap allocation
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
