@@ -2,6 +2,7 @@
 // This source code is licensed under both the Apache 2.0 and MIT License
 // (found in the LICENSE-* files in the repository)
 
+use crate::Arc;
 use crate::{
     id::SegmentId,
     key_range::KeyRange,
@@ -13,7 +14,7 @@ use std::{
     io::{Cursor, Write},
     marker::PhantomData,
     path::{Path, PathBuf},
-    sync::{Arc, RwLock},
+    sync::RwLock,
 };
 
 pub const VLOG_MARKER: &str = ".vlog";

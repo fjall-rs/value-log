@@ -5,6 +5,9 @@
 use crate::{blob_cache::BlobCache, compression::Compressor};
 use std::sync::Arc;
 
+// TODO: 2.0.0 use triomphe::Arc everywhere
+// change blob cache API, so the user does not need to use Arc<> at all
+
 /// Value log configuration
 pub struct Config<C: Compressor + Clone> {
     /// Target size of vLog segments

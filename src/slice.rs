@@ -2,8 +2,8 @@
 // This source code is licensed under both the Apache 2.0 and MIT License
 // (found in the LICENSE-* files in the repository)
 
+use crate::Arc;
 use std::hash::Hash;
-use triomphe::Arc;
 
 /// An immutable byte slice that can be cloned without additional heap allocation
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
