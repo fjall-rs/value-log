@@ -2,11 +2,9 @@
 // This source code is licensed under both the Apache 2.0 and MIT License
 // (found in the LICENSE-* files in the repository)
 
+use crate::Arc;
 use crate::{value::UserKey, IndexReader, IndexWriter, ValueHandle};
-use std::{
-    collections::BTreeMap,
-    sync::{Arc, RwLock},
-};
+use std::{collections::BTreeMap, sync::RwLock};
 
 type MockIndexInner = RwLock<BTreeMap<UserKey, (ValueHandle, u32)>>;
 

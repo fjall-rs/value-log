@@ -2,7 +2,8 @@
 // This source code is licensed under both the Apache 2.0 and MIT License
 // (found in the LICENSE-* files in the repository)
 
-use std::sync::{atomic::AtomicU64, Arc};
+use crate::Arc;
+use std::sync::atomic::AtomicU64;
 
 #[allow(clippy::module_name_repetitions)]
 pub type SegmentId = u64;
