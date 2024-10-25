@@ -107,11 +107,20 @@ impl<C: Compressor + Clone> SegmentManifest<C> {
     /// Recovers a value log from disk
     pub(crate) fn recover<P: AsRef<Path>>(folder: P) -> crate::Result<Self> {
         let folder = folder.as_ref();
-        let path = folder.join(MANIFEST_FILE);
+        let manifest_path = folder.join(MANIFEST_FILE);
 
-        let ids = Self::load_ids_from_disk(&path)?;
+        log::info!("Recovering vLog at {folder:?}");
 
-        log::debug!("Recovering vLog segments: {ids:?}");
+        let ids = Self::load_ids_from_disk(&manifest_path)?;
+        let cnt = ids.len();
+
+        let progress_mod = match cnt {
+            _ if cnt <= 20 => 1,
+            _ if cnt <= 100 => 10,
+            _ => 100,
+        };
+
+        log::debug!("Recovering {cnt} vLog segments from {folder:?}");
 
         let segments_folder = folder.join(SEGMENTS_FOLDER);
         Self::remove_unfinished_segments(&segments_folder, &ids)?;
@@ -120,7 +129,7 @@ impl<C: Compressor + Clone> SegmentManifest<C> {
             let mut map =
                 HashMap::with_capacity_and_hasher(100, xxhash_rust::xxh3::Xxh3Builder::new());
 
-            for id in ids {
+            for (idx, &id) in ids.iter().enumerate() {
                 log::trace!("Recovering segment #{id:?}");
 
                 let path = segments_folder.join(id.to_string());
@@ -136,13 +145,17 @@ impl<C: Compressor + Clone> SegmentManifest<C> {
                         _phantom: PhantomData,
                     }),
                 );
+
+                if idx % progress_mod == 0 {
+                    log::debug!("Recovered {idx}/{cnt} vLog segments");
+                }
             }
 
             map
         };
 
         Ok(Self(Arc::new(SegmentManifestInner {
-            path,
+            path: manifest_path,
             segments: RwLock::new(segments),
         })))
     }
