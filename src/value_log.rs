@@ -417,7 +417,7 @@ impl<C: Compressor + Clone> ValueLog<C> {
                 log::debug!(
                 "Blob file #{id} has no incoming references - can be dropped, freeing {} KiB on disk (userdata={} MiB)",
                 segment.meta.compressed_bytes / 1_024,
-                total_bytes / 1_024/ 1_024
+                total_bytes / 1_024 / 1_024,
             );
                 self.mark_as_stale(&[id]);
 
