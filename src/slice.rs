@@ -15,6 +15,22 @@ impl Slice {
     pub fn new(bytes: &[u8]) -> Self {
         Self::from(bytes)
     }
+
+    #[must_use]
+    #[doc(hidden)]
+    pub fn with_size(len: usize) -> Self {
+        // TODO: optimize this with byteview to remove the reallocation
+        let v = vec![0; len];
+        Self(v.into())
+    }
+
+    #[doc(hidden)]
+    pub fn from_reader<R: std::io::Read>(reader: &mut R, len: usize) -> std::io::Result<Self> {
+        let mut view = Self::with_size(len);
+        let builder = Arc::get_mut(&mut view.0).expect("we are the owner");
+        reader.read_exact(builder)?;
+        Ok(view)
+    }
 }
 
 impl std::borrow::Borrow<[u8]> for Slice {

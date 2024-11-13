@@ -23,30 +23,34 @@ fn basic_kv() -> value_log::Result<()> {
 
     let index = MockIndex::default();
 
-    let value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default())?;
-
     let items = ["a", "b", "c", "d", "e"];
 
     {
-        let mut index_writer = MockIndexWriter(index.clone());
-        let mut writer = value_log.get_writer()?;
+        let value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default())?;
 
-        for key in &items {
-            let value = key.repeat(10_000);
-            let value = value.as_bytes();
+        {
+            let mut index_writer = MockIndexWriter(index.clone());
+            let mut writer = value_log.get_writer()?;
 
-            let key = key.as_bytes();
+            for key in &items {
+                let value = key.repeat(10_000);
+                let value = value.as_bytes();
 
-            let vhandle = writer.get_next_value_handle();
-            index_writer.insert_indirect(key, vhandle, value.len() as u32)?;
+                let key = key.as_bytes();
 
-            writer.write(key, value)?;
+                let vhandle = writer.get_next_value_handle();
+                index_writer.insert_indirect(key, vhandle, value.len() as u32)?;
+
+                writer.write(key, value)?;
+            }
+
+            value_log.register_writer(writer)?;
         }
-
-        value_log.register_writer(writer)?;
     }
 
     {
+        let value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default())?;
+
         assert_eq!(1, value_log.segment_count());
 
         let segments = value_log.manifest.list_segments();
@@ -65,11 +69,11 @@ fn basic_kv() -> value_log::Result<()> {
             segment.len(),
             segment.scan().into_iter().flatten().count() as u64
         );
-    }
 
-    for (key, (vhandle, _)) in index.read().unwrap().iter() {
-        let item = value_log.get(vhandle)?.unwrap();
-        assert_eq!(&*item, &*key.repeat(10_000));
+        for (key, (vhandle, _)) in index.read().unwrap().iter() {
+            let item = value_log.get(vhandle)?.unwrap();
+            assert_eq!(&*item, &*key.repeat(10_000));
+        }
     }
 
     Ok(())
