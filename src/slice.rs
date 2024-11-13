@@ -22,13 +22,14 @@ impl Slice {
         Self(ByteView::with_size(len))
     }
 
-    // TODO: get_mut, update_prefix should probably be unsafe
     #[doc(hidden)]
     pub fn from_reader<R: std::io::Read>(reader: &mut R, len: usize) -> std::io::Result<Self> {
+        use std::ops::DerefMut;
+
         let mut view = Self::with_size(len);
-        let builder = view.0.get_mut().expect("we are the owner");
-        reader.read_exact(builder)?;
-        view.0.update_prefix();
+        let mut builder = view.0.get_mut().expect("we are the owner");
+        reader.read_exact(builder.deref_mut())?;
+
         Ok(view)
     }
 

@@ -40,7 +40,7 @@ impl<C: Compressor + Clone> GcStrategy<C> for StaleThresholdStrategy {
             .read()
             .expect("lock is poisoned")
             .values()
-            .filter(|x| x.stale_ratio() >= self.0)
+            .filter(|x| x.stale_ratio() > self.0)
             .map(|x| x.id)
             .collect::<Vec<_>>()
     }
@@ -79,7 +79,11 @@ impl<C: Compressor + Clone> GcStrategy<C> for SpaceAmpStrategy {
                 .segments
                 .read()
                 .expect("lock is poisoned");
-            let mut segments = lock.values().collect::<Vec<_>>();
+
+            let mut segments = lock
+                .values()
+                .filter(|x| x.stale_ratio() > 0.0)
+                .collect::<Vec<_>>();
 
             // Sort by stale ratio descending
             segments.sort_by(|a, b| {
