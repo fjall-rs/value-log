@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{Bytes, BytesMut};
 
 /// An immutable byte slice that can be cloned without additional heap allocation
 #[derive(Debug, Clone, Eq, Hash, Ord)]
@@ -14,7 +14,7 @@ impl Slice {
     /// Construct a [`Slice`] from a byte slice.
     #[must_use]
     pub fn new(bytes: &[u8]) -> Self {
-        Self::from(bytes)
+        Self(Bytes::copy_from_slice(bytes))
     }
 
     #[doc(hidden)]
@@ -43,97 +43,23 @@ impl From<Slice> for Bytes {
     }
 }
 
-impl From<&[u8]> for Slice {
-    fn from(value: &[u8]) -> Self {
-        Self(Bytes::copy_from_slice(value))
-    }
-}
-
-impl From<Arc<[u8]>> for Slice {
-    fn from(value: Arc<[u8]>) -> Self {
-        value.as_ref().into()
-    }
-}
-
+// Bytes::from<Vec<u8>> is zero-copy optimized
 impl From<Vec<u8>> for Slice {
     fn from(value: Vec<u8>) -> Self {
-        Self(value.into())
+        Self(Bytes::from(value))
     }
 }
 
-impl From<&str> for Slice {
-    fn from(value: &str) -> Self {
-        Self::from(value.as_bytes())
-    }
-}
-
+// Bytes::from<String> is zero-copy optimized
 impl From<String> for Slice {
     fn from(value: String) -> Self {
-        Self(value.into())
+        Self(Bytes::from(value))
     }
 }
 
-impl From<Arc<str>> for Slice {
-    fn from(value: Arc<str>) -> Self {
-        Self::from(&*value)
-    }
-}
-
-impl<const N: usize> From<[u8; N]> for Slice {
-    fn from(value: [u8; N]) -> Self {
-        Self::from(value.as_slice())
-    }
-}
-
-impl FromIterator<u8> for Slice {
-    fn from_iter<T>(iter: T) -> Self
-    where
-        T: IntoIterator<Item = u8>,
-    {
-        Self(Bytes::from_iter(iter))
-    }
-}
-
-impl std::ops::Deref for Slice {
-    type Target = [u8];
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl std::borrow::Borrow<[u8]> for Slice {
-    fn borrow(&self) -> &[u8] {
-        self
-    }
-}
-
-impl<T> PartialEq<T> for Slice
-where
-    T: AsRef<[u8]>,
-{
-    fn eq(&self, other: &T) -> bool {
-        self.as_ref() == other.as_ref()
-    }
-}
-
-impl PartialEq<Slice> for &[u8] {
-    fn eq(&self, other: &Slice) -> bool {
-        *self == other.as_ref()
-    }
-}
-
-impl<T> PartialOrd<T> for Slice
-where
-    T: AsRef<[u8]>,
-{
-    fn partial_cmp(&self, other: &T) -> Option<std::cmp::Ordering> {
-        self.as_ref().partial_cmp(other.as_ref())
-    }
-}
-
-impl PartialOrd<Slice> for &[u8] {
-    fn partial_cmp(&self, other: &Slice) -> Option<std::cmp::Ordering> {
-        (*self).partial_cmp(other.as_ref())
+// Needed because slice_arc specializes this impl
+impl From<Arc<[u8]>> for Slice {
+    fn from(value: Arc<[u8]>) -> Self {
+        Self::new(value.as_ref())
     }
 }
