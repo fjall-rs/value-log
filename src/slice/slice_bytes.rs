@@ -8,7 +8,7 @@ use bytes::{Bytes, BytesMut};
 
 /// An immutable byte slice that can be cloned without additional heap allocation
 #[derive(Debug, Clone, Eq, Hash, Ord)]
-pub struct Slice(Bytes);
+pub struct Slice(pub(super) Bytes);
 
 impl Slice {
     /// Construct a [`Slice`] from a byte slice.
@@ -22,12 +22,6 @@ impl Slice {
         let mut builder = BytesMut::zeroed(len);
         reader.read_exact(&mut builder)?;
         Ok(builder.freeze().into())
-    }
-}
-
-impl AsRef<[u8]> for Slice {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
     }
 }
 

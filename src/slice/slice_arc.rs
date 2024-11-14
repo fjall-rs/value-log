@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 /// An immutable byte slice that can be cloned without additional heap allocation
 #[derive(Debug, Clone, Eq, Hash, Ord)]
-pub struct Slice(Arc<[u8]>);
+pub struct Slice(pub(super) Arc<[u8]>);
 
 impl Slice {
     /// Construct a [`Slice`] from a byte slice.
@@ -29,12 +29,6 @@ impl Slice {
         let builder = Arc::get_mut(&mut view.0).expect("we are the owner");
         reader.read_exact(builder)?;
         Ok(view)
-    }
-}
-
-impl AsRef<[u8]> for Slice {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
     }
 }
 

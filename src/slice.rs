@@ -15,6 +15,12 @@ pub use slice_arc::Slice;
 #[cfg(feature = "bytes")]
 pub use slice_bytes::Slice;
 
+impl AsRef<[u8]> for Slice {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
 impl From<&[u8]> for Slice {
     fn from(value: &[u8]) -> Self {
         Self::new(value)
