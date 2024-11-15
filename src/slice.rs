@@ -2,83 +2,18 @@
 // This source code is licensed under both the Apache 2.0 and MIT License
 // (found in the LICENSE-* files in the repository)
 
-use std::hash::Hash;
+#[cfg(not(feature = "bytes"))]
+mod slice_arc;
+
+#[cfg(feature = "bytes")]
+mod slice_bytes;
+
 use std::sync::Arc;
 
-/// An immutable byte slice that can be cloned without additional heap allocation
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
-pub struct Slice(Arc<[u8]>);
-
-impl Slice {
-    /// Construct a [`Slice`] from a byte slice.
-    #[must_use]
-    pub fn new(bytes: &[u8]) -> Self {
-        Self::from(bytes)
-    }
-
-    #[must_use]
-    #[doc(hidden)]
-    pub fn with_size(len: usize) -> Self {
-        // TODO: optimize this with byteview to remove the reallocation
-        let v = vec![0; len];
-        Self(v.into())
-    }
-
-    #[doc(hidden)]
-    pub fn from_reader<R: std::io::Read>(reader: &mut R, len: usize) -> std::io::Result<Self> {
-        let mut view = Self::with_size(len);
-        let builder = Arc::get_mut(&mut view.0).expect("we are the owner");
-        reader.read_exact(builder)?;
-        Ok(view)
-    }
-}
-
-impl std::borrow::Borrow<[u8]> for Slice {
-    fn borrow(&self) -> &[u8] {
-        self
-    }
-}
-
-impl std::ops::Deref for Slice {
-    type Target = [u8];
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl PartialEq<[u8]> for Slice {
-    fn eq(&self, other: &[u8]) -> bool {
-        self.0.as_ref() == other
-    }
-}
-
-impl PartialEq<Slice> for &[u8] {
-    fn eq(&self, other: &Slice) -> bool {
-        *self == other.0.as_ref()
-    }
-}
-
-impl PartialOrd<[u8]> for Slice {
-    fn partial_cmp(&self, other: &[u8]) -> Option<std::cmp::Ordering> {
-        self.0.as_ref().partial_cmp(other)
-    }
-}
-
-impl PartialOrd<Slice> for &[u8] {
-    fn partial_cmp(&self, other: &Slice) -> Option<std::cmp::Ordering> {
-        self.partial_cmp(&other.0.as_ref())
-    }
-}
-
-impl FromIterator<u8> for Slice {
-    fn from_iter<T>(iter: T) -> Self
-    where
-        T: IntoIterator<Item = u8>,
-    {
-        Self::from(iter.into_iter().collect::<Vec<u8>>())
-    }
-}
+#[cfg(not(feature = "bytes"))]
+pub use slice_arc::Slice;
+#[cfg(feature = "bytes")]
+pub use slice_bytes::Slice;
 
 impl AsRef<[u8]> for Slice {
     fn as_ref(&self) -> &[u8] {
@@ -88,30 +23,12 @@ impl AsRef<[u8]> for Slice {
 
 impl From<&[u8]> for Slice {
     fn from(value: &[u8]) -> Self {
-        Self(value.into())
-    }
-}
-
-impl From<Arc<[u8]>> for Slice {
-    fn from(value: Arc<[u8]>) -> Self {
-        Self(value)
-    }
-}
-
-impl From<Vec<u8>> for Slice {
-    fn from(value: Vec<u8>) -> Self {
-        Self(value.into())
+        Self::new(value)
     }
 }
 
 impl From<&str> for Slice {
     fn from(value: &str) -> Self {
-        Self::from(value.as_bytes())
-    }
-}
-
-impl From<String> for Slice {
-    fn from(value: String) -> Self {
         Self::from(value.as_bytes())
     }
 }
@@ -125,6 +42,59 @@ impl From<Arc<str>> for Slice {
 impl<const N: usize> From<[u8; N]> for Slice {
     fn from(value: [u8; N]) -> Self {
         Self::from(value.as_slice())
+    }
+}
+
+impl FromIterator<u8> for Slice {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = u8>,
+    {
+        Vec::from_iter(iter).into()
+    }
+}
+
+impl std::ops::Deref for Slice {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        self.as_ref()
+    }
+}
+
+impl std::borrow::Borrow<[u8]> for Slice {
+    fn borrow(&self) -> &[u8] {
+        self
+    }
+}
+
+impl<T> PartialEq<T> for Slice
+where
+    T: AsRef<[u8]>,
+{
+    fn eq(&self, other: &T) -> bool {
+        self.as_ref() == other.as_ref()
+    }
+}
+
+impl PartialEq<Slice> for &[u8] {
+    fn eq(&self, other: &Slice) -> bool {
+        *self == other.as_ref()
+    }
+}
+
+impl<T> PartialOrd<T> for Slice
+where
+    T: AsRef<[u8]>,
+{
+    fn partial_cmp(&self, other: &T) -> Option<std::cmp::Ordering> {
+        self.as_ref().partial_cmp(other.as_ref())
+    }
+}
+
+impl PartialOrd<Slice> for &[u8] {
+    fn partial_cmp(&self, other: &Slice) -> Option<std::cmp::Ordering> {
+        (*self).partial_cmp(other.as_ref())
     }
 }
 
@@ -169,5 +139,54 @@ mod serde {
 
             deserializer.deserialize_bytes(SliceVisitor)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Slice;
+    use std::{fmt::Debug, sync::Arc};
+
+    fn assert_slice_handles<T>(v: T)
+    where
+        T: Clone + Debug,
+        Slice: From<T> + PartialEq<T> + PartialOrd<T>,
+    {
+        // verify slice arc roundtrips
+        let slice: Slice = v.clone().into();
+        assert_eq!(slice, v, "slice_arc: {slice:?}, v: {v:?}");
+        assert!(slice >= v, "slice_arc: {slice:?}, v: {v:?}");
+    }
+
+    /// This test verifies that we can create a `Slice` from various types and compare a `Slice` with them.
+    #[test]
+    fn test_slice_instantiation() {
+        // - &[u8]
+        assert_slice_handles::<&[u8]>(&[1, 2, 3, 4]);
+        // - Arc<u8>
+        assert_slice_handles::<Arc<[u8]>>(Arc::new([1, 2, 3, 4]));
+        // - Vec<u8>
+        assert_slice_handles::<Vec<u8>>(vec![1, 2, 3, 4]);
+        // - &str
+        assert_slice_handles::<&str>("hello");
+        // - String
+        assert_slice_handles::<String>("hello".to_string());
+        // - [u8; N]
+        assert_slice_handles::<[u8; 4]>([1, 2, 3, 4]);
+
+        // Special case for these types
+        // - Iterator<Item = u8>
+        let slice = Slice::from_iter(vec![1, 2, 3, 4]);
+        assert_eq!(slice, vec![1, 2, 3, 4]);
+
+        // - Arc<str>
+        let arc_str: Arc<str> = Arc::from("hello");
+        let slice = Slice::from(arc_str.clone());
+        assert_eq!(slice.as_ref(), arc_str.as_bytes());
+
+        // - io::Read
+        let reader = std::io::Cursor::new(vec![1, 2, 3, 4]);
+        let slice = Slice::from_reader(&mut reader.clone(), 4).expect("read");
+        assert_eq!(slice, vec![1, 2, 3, 4]);
     }
 }
