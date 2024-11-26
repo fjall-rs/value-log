@@ -271,6 +271,10 @@ impl<C: Compressor + Clone> ValueLog<C> {
         self.blob_cache
             .insert((self.id, vhandle.clone()).into(), val.clone());
 
+        // TODO: maybe we can look at the value size and prefetch some more values
+        // without causing another I/O...
+        // TODO: benchmark range reads for rather small non-inlined blobs (maybe ~512-1000B)
+        // and see how different BufReader capacities and prefetch changes range read performance
         for _ in 0..prefetch_size {
             let offset = reader.get_offset()?;
 
