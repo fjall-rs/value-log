@@ -5,7 +5,10 @@
 // count of 0. Then it would be dropped even though it was just created.
 
 use test_log::test;
-use value_log::{Compressor, Config, IndexWriter, MockIndex, MockIndexWriter, ValueLog};
+use value_log::{
+    BlobCache, Compressor, Config, IndexWriter, MockIndex, MockIndexWriter, UserValue, ValueHandle,
+    ValueLog, ValueLogId,
+};
 
 #[derive(Clone, Default)]
 struct NoCompressor;
@@ -20,6 +23,17 @@ impl Compressor for NoCompressor {
     }
 }
 
+#[derive(Clone)]
+struct NoCacher;
+
+impl BlobCache for NoCacher {
+    fn get(&self, _: ValueLogId, _: &ValueHandle) -> Option<UserValue> {
+        None
+    }
+
+    fn insert(&self, _: ValueLogId, _: &ValueHandle, _: UserValue) {}
+}
+
 #[test]
 fn accidental_drop_rc() -> value_log::Result<()> {
     let folder = tempfile::tempdir()?;
@@ -27,7 +41,7 @@ fn accidental_drop_rc() -> value_log::Result<()> {
 
     let index = MockIndex::default();
 
-    let value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default())?;
+    let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher))?;
 
     for key in ["a", "b"] {
         let value = &key;

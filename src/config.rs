@@ -3,33 +3,29 @@
 // (found in the LICENSE-* files in the repository)
 
 use crate::{blob_cache::BlobCache, compression::Compressor};
-use std::sync::Arc;
 
 /// Value log configuration
-pub struct Config<C: Compressor + Clone> {
+pub struct Config<BC: BlobCache, C: Compressor + Clone> {
     /// Target size of vLog segments
     pub(crate) segment_size_bytes: u64,
 
     /// Blob cache to use
-    pub(crate) blob_cache: Arc<BlobCache>,
+    pub(crate) blob_cache: BC,
 
     /// Compression to use
     pub(crate) compression: C,
 }
 
-impl<C: Compressor + Clone + Default> Default for Config<C> {
-    fn default() -> Self {
+impl<BC: BlobCache, C: Compressor + Clone + Default> Config<BC, C> {
+    /// Creates a new configuration builder.
+    pub fn new(blob_cache: BC) -> Self {
         Self {
-            segment_size_bytes: /* 256 MiB */ 256 * 1_024 * 1_024,
-            blob_cache: Arc::new(BlobCache::with_capacity_bytes(
-                /* 16 MiB */ 16 * 1_024 * 1_024,
-            )),
-            compression: C::default(),
+            blob_cache,
+            compression: Default::default(),
+            segment_size_bytes: 128 * 1_024 * 1_024,
         }
     }
-}
 
-impl<C: Compressor + Clone> Config<C> {
     /// Sets the compression & decompression scheme.
     #[must_use]
     pub fn compression(mut self, compressor: C) -> Self {
@@ -41,10 +37,8 @@ impl<C: Compressor + Clone> Config<C> {
     ///
     /// You can create a global [`BlobCache`] and share it between multiple
     /// value logs to cap global cache memory usage.
-    ///
-    /// Defaults to a blob cache with 16 MiB of capacity *per value log*.
     #[must_use]
-    pub fn blob_cache(mut self, blob_cache: Arc<BlobCache>) -> Self {
+    pub fn blob_cache(mut self, blob_cache: BC) -> Self {
         self.blob_cache = blob_cache;
         self
     }

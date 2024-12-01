@@ -1,5 +1,8 @@
 use test_log::test;
-use value_log::{Compressor, Config, IndexWriter, MockIndex, MockIndexWriter, ValueLog};
+use value_log::{
+    BlobCache, Compressor, Config, IndexWriter, MockIndex, MockIndexWriter, UserValue, ValueHandle,
+    ValueLog, ValueLogId,
+};
 
 #[derive(Clone, Default)]
 struct NoCompressor;
@@ -14,6 +17,17 @@ impl Compressor for NoCompressor {
     }
 }
 
+#[derive(Clone)]
+struct NoCacher;
+
+impl BlobCache for NoCacher {
+    fn get(&self, _: ValueLogId, _: &ValueHandle) -> Option<UserValue> {
+        None
+    }
+
+    fn insert(&self, _: ValueLogId, _: &ValueHandle, _: UserValue) {}
+}
+
 #[test]
 fn basic_recovery() -> value_log::Result<()> {
     let folder = tempfile::tempdir()?;
@@ -24,7 +38,7 @@ fn basic_recovery() -> value_log::Result<()> {
     let items = ["a", "b", "c", "d", "e"];
 
     {
-        let value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default())?;
+        let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher))?;
 
         {
             let mut index_writer = MockIndexWriter(index.clone());
@@ -61,7 +75,7 @@ fn basic_recovery() -> value_log::Result<()> {
     }
 
     {
-        let value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default())?;
+        let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher))?;
 
         value_log.scan_for_stats(index.read().unwrap().values().cloned().map(Ok))?;
 
@@ -95,12 +109,12 @@ fn delete_unfinished_segment_folders() -> value_log::Result<()> {
     assert!(mock_path.try_exists()?);
 
     {
-        let _value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default())?;
+        let _value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher))?;
         assert!(mock_path.try_exists()?);
     }
 
     {
-        let _value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default())?;
+        let _value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher))?;
         assert!(!mock_path.try_exists()?);
     }
 

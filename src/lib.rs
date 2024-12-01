@@ -137,7 +137,7 @@ pub use {
     segment::multi_writer::MultiWriter as SegmentWriter,
     slice::Slice,
     value::{UserKey, UserValue},
-    value_log::ValueLog,
+    value_log::{ValueLog, ValueLogId},
     version::Version,
 };
 
