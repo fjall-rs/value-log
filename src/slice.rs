@@ -33,6 +33,12 @@ impl From<&str> for Slice {
     }
 }
 
+impl From<&String> for Slice {
+    fn from(value: &String) -> Self {
+        Self::from(value.as_str())
+    }
+}
+
 impl From<Arc<str>> for Slice {
     fn from(value: Arc<str>) -> Self {
         Self::from(&*value)
