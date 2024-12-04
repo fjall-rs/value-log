@@ -57,6 +57,12 @@ impl<const N: usize> From<[u8; N]> for Slice {
     }
 }
 
+impl<const N: usize> From<&[u8; N]> for Slice {
+    fn from(value: &[u8; N]) -> Self {
+        Self::from(value.as_slice())
+    }
+}
+
 impl FromIterator<u8> for Slice {
     fn from_iter<T>(iter: T) -> Self
     where
