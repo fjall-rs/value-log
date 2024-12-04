@@ -213,7 +213,7 @@ impl<C: Compressor + Clone> SegmentManifest<C> {
         self.atomic_swap(move |recipe| {
             for writer in writers {
                 if writer.item_count == 0 {
-                    log::trace!(
+                    log::debug!(
                         "Writer at {:?} has written no data, deleting empty vLog segment file",
                         writer.path
                     );
