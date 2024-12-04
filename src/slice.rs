@@ -219,7 +219,7 @@ mod tests {
         assert_eq!(slice.as_ref(), arc_str.as_bytes());
 
         // - io::Read
-        let reader = std::io::Cursor::new(vec![1, 2, 3, 4]);
+        let mut reader = std::io::Cursor::new(vec![1, 2, 3, 4]);
         let slice = Slice::from_reader(&mut reader, 4).expect("read");
         assert_eq!(slice, vec![1, 2, 3, 4]);
     }
