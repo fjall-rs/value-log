@@ -27,6 +27,12 @@ impl From<&[u8]> for Slice {
     }
 }
 
+impl From<&Vec<u8>> for Slice {
+    fn from(value: &Vec<u8>) -> Self {
+        Self::from(value.as_slice())
+    }
+}
+
 impl From<&str> for Slice {
     fn from(value: &str) -> Self {
         Self::from(value.as_bytes())
