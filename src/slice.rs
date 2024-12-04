@@ -27,9 +27,21 @@ impl From<&[u8]> for Slice {
     }
 }
 
+impl From<&Vec<u8>> for Slice {
+    fn from(value: &Vec<u8>) -> Self {
+        Self::from(value.as_slice())
+    }
+}
+
 impl From<&str> for Slice {
     fn from(value: &str) -> Self {
         Self::from(value.as_bytes())
+    }
+}
+
+impl From<&String> for Slice {
+    fn from(value: &String) -> Self {
+        Self::from(value.as_str())
     }
 }
 
@@ -41,6 +53,12 @@ impl From<Arc<str>> for Slice {
 
 impl<const N: usize> From<[u8; N]> for Slice {
     fn from(value: [u8; N]) -> Self {
+        Self::from(value.as_slice())
+    }
+}
+
+impl<const N: usize> From<&[u8; N]> for Slice {
+    fn from(value: &[u8; N]) -> Self {
         Self::from(value.as_slice())
     }
 }
