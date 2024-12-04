@@ -99,6 +99,7 @@ impl<C: Compressor + Clone> Iterator for Reader<C> {
             }
         };
 
+        // TODO: optimize using Slice::from_reader
         let mut key = vec![0; key_len.into()];
         if let Err(e) = self.inner.read_exact(&mut key) {
             return Some(Err(e.into()));
@@ -114,6 +115,7 @@ impl<C: Compressor + Clone> Iterator for Reader<C> {
             }
         };
 
+        // TODO: optimize using Slice::from_reader
         let mut val = vec![0; val_len as usize];
         if let Err(e) = self.inner.read_exact(&mut val) {
             return Some(Err(e.into()));
