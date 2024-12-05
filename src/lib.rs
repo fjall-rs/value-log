@@ -36,58 +36,6 @@
 //! - you are storing large values (HTML pages, big JSON, small images, archiving, ...)
 //! - your data is rarely deleted or updated, or you do not have strict disk space requirements
 //! - your access pattern is point read heavy
-//!
-//! # Example usage
-//!
-//! ```
-//! # use value_log::{IndexReader, IndexWriter, MockIndex, MockIndexWriter};
-//! use value_log::{Config, ValueHandle, ValueLog};
-//!
-//! # fn main() -> value_log::Result<()> {
-//! # let folder = tempfile::tempdir()?;
-//! # let index = MockIndex::default();
-//! # let path = folder.path();
-//! #
-//! # #[derive(Clone, Default)]
-//! # struct MyCompressor;
-//! #
-//! # impl value_log::Compressor for MyCompressor {
-//! #    fn compress(&self, bytes: &[u8]) -> value_log::Result<Vec<u8>> {
-//! #        Ok(bytes.into())
-//! #    }
-//! #
-//! #    fn decompress(&self, bytes: &[u8]) -> value_log::Result<Vec<u8>> {
-//! #        Ok(bytes.into())
-//! #    }
-//! # }
-//! // Open or recover value log from disk
-//! let value_log = ValueLog::open(path, Config::<MyCompressor>::default())?;
-//!
-//! // Write some data
-//! # let mut index_writer = MockIndexWriter(index.clone());
-//! let mut writer = value_log.get_writer()?;
-//!
-//! for key in ["a", "b", "c", "d", "e"] {
-//!     let value = key.repeat(10_000);
-//!     let value = value.as_bytes();
-//!
-//!     let key = key.as_bytes();
-//!
-//!     let vhandle = writer.get_next_value_handle();
-//!     index_writer.insert_indirect(key, vhandle, value.len() as u32)?;
-//!
-//!     writer.write(key, value)?;
-//! }
-//!
-//! // Finish writing
-//! value_log.register_writer(writer)?;
-//!
-//! // Get some stats
-//! assert_eq!(1.0, value_log.space_amp());
-//! #
-//! # Ok(())
-//! # }
-//! ```
 
 #![doc(html_logo_url = "https://raw.githubusercontent.com/fjall-rs/value-log/main/logo.png")]
 #![doc(html_favicon_url = "https://raw.githubusercontent.com/fjall-rs/value-log/main/logo.png")]
