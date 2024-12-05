@@ -4,7 +4,7 @@
 
 pub mod report;
 
-use crate::{id::SegmentId, Compressor, ValueLog};
+use crate::{id::SegmentId, BlobCache, Compressor, ValueLog};
 
 /// GC strategy
 #[allow(clippy::module_name_repetitions)]
