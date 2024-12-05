@@ -2,9 +2,9 @@
 // This source code is licensed under both the Apache 2.0 and MIT License
 // (found in the LICENSE-* files in the repository)
 
-use crate::{id::SegmentId, BlobCache, Compressor, ValueLog};
-
 pub mod report;
+
+use crate::{id::SegmentId, Compressor, ValueLog};
 
 /// GC strategy
 #[allow(clippy::module_name_repetitions)]

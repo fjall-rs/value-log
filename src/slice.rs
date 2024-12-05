@@ -8,7 +8,10 @@ mod slice_arc;
 #[cfg(feature = "bytes")]
 mod slice_bytes;
 
-use std::sync::Arc;
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 #[cfg(not(feature = "bytes"))]
 pub use slice_arc::Slice;
@@ -27,9 +30,33 @@ impl From<&[u8]> for Slice {
     }
 }
 
+impl From<&Vec<u8>> for Slice {
+    fn from(value: &Vec<u8>) -> Self {
+        Self::from(value.as_slice())
+    }
+}
+
 impl From<&str> for Slice {
     fn from(value: &str) -> Self {
         Self::from(value.as_bytes())
+    }
+}
+
+impl From<&String> for Slice {
+    fn from(value: &String) -> Self {
+        Self::from(value.as_str())
+    }
+}
+
+impl From<&Path> for Slice {
+    fn from(value: &Path) -> Self {
+        Self::from(value.as_os_str().as_encoded_bytes())
+    }
+}
+
+impl From<PathBuf> for Slice {
+    fn from(value: PathBuf) -> Self {
+        Self::from(value.as_os_str().as_encoded_bytes())
     }
 }
 
@@ -41,6 +68,12 @@ impl From<Arc<str>> for Slice {
 
 impl<const N: usize> From<[u8; N]> for Slice {
     fn from(value: [u8; N]) -> Self {
+        Self::from(value.as_slice())
+    }
+}
+
+impl<const N: usize> From<&[u8; N]> for Slice {
+    fn from(value: &[u8; N]) -> Self {
         Self::from(value.as_slice())
     }
 }
@@ -143,6 +176,7 @@ mod serde {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used)]
 mod tests {
     use super::Slice;
     use std::{fmt::Debug, sync::Arc};
@@ -185,8 +219,8 @@ mod tests {
         assert_eq!(slice.as_ref(), arc_str.as_bytes());
 
         // - io::Read
-        let reader = std::io::Cursor::new(vec![1, 2, 3, 4]);
-        let slice = Slice::from_reader(&mut reader.clone(), 4).expect("read");
+        let mut reader = std::io::Cursor::new(vec![1, 2, 3, 4]);
+        let slice = Slice::from_reader(&mut reader, 4).expect("read");
         assert_eq!(slice, vec![1, 2, 3, 4]);
     }
 }
