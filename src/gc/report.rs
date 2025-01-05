@@ -40,7 +40,7 @@ impl std::fmt::Display for GcReport {
         writeln!(f, "Stale bytes: {}", self.stale_bytes)?;
         writeln!(f, "Total blobs: {}", self.total_blobs)?;
         writeln!(f, "Stale blobs: {}", self.stale_blobs)?;
-        writeln!(f, "Stale %    : {}", self.stale_ratio())?;
+        writeln!(f, "Stale ratio: {}", self.stale_ratio())?;
         writeln!(f, "Space amp  : {}", self.space_amp())?;
         writeln!(f, "--- GC report done ---")?;
         Ok(())
