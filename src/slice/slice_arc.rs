@@ -24,16 +24,8 @@ impl Slice {
 
     #[doc(hidden)]
     pub fn from_reader<R: std::io::Read>(reader: &mut R, len: usize) -> std::io::Result<Self> {
-        use std::ops::DerefMut;
-
-        // TODO: impl from_reader in Byteview, can skip get_mut in "constructor"
-        let mut view = Self::with_size(len);
-        {
-            let mut builder = view.0.get_mut().expect("we are the owner");
-            reader.read_exact(builder.deref_mut())?;
-        }
-
-        Ok(view)
+        let view = ByteView::from_reader(reader, len)?;
+        Ok(Self(view))
     }
 }
 
