@@ -17,6 +17,12 @@ impl Slice {
     }
 
     #[doc(hidden)]
+    #[must_use]
+    pub fn slice(&self, range: impl std::ops::RangeBounds<usize>) -> Self {
+        Self(self.0.slice(range))
+    }
+
+    #[doc(hidden)]
     pub fn from_reader<R: std::io::Read>(reader: &mut R, len: usize) -> std::io::Result<Self> {
         let mut builder = BytesMut::zeroed(len);
         reader.read_exact(&mut builder)?;

@@ -16,6 +16,12 @@ impl Slice {
         Self(bytes.into())
     }
 
+    #[doc(hidden)]
+    #[must_use]
+    pub fn slice(&self, range: impl std::ops::RangeBounds<usize>) -> Self {
+        Self(self.0.slice(range))
+    }
+
     #[must_use]
     #[doc(hidden)]
     pub fn with_size(len: usize) -> Self {
