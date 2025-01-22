@@ -71,10 +71,7 @@ impl<C: Compressor + Clone> Iterator for Reader<C> {
 
         {
             let mut buf = [0; BLOB_HEADER_MAGIC.len()];
-
-            if let Err(e) = self.inner.read_exact(&mut buf) {
-                return Some(Err(e.into()));
-            };
+            fail_iter!(self.inner.read_exact(&mut buf));
 
             if buf == METADATA_HEADER_MAGIC {
                 self.is_terminated = true;
