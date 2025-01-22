@@ -3,10 +3,8 @@
 // (found in the LICENSE-* files in the repository)
 
 use crate::{id::SegmentId, value::UserKey, Compressor, SegmentReader, UserValue};
+use interval_heap::IntervalHeap;
 use std::cmp::Reverse;
-
-// TODO: replace with MinHeap...
-use min_max_heap::MinMaxHeap;
 
 type IteratorIndex = usize;
 
@@ -42,16 +40,14 @@ impl Ord for IteratorValue {
 #[allow(clippy::module_name_repetitions)]
 pub struct MergeReader<C: Compressor + Clone> {
     readers: Vec<SegmentReader<C>>,
-    heap: MinMaxHeap<IteratorValue>,
+    heap: IntervalHeap<IteratorValue>,
 }
 
 impl<C: Compressor + Clone> MergeReader<C> {
     /// Initializes a new merging reader
     pub fn new(readers: Vec<SegmentReader<C>>) -> Self {
-        Self {
-            readers,
-            heap: MinMaxHeap::new(),
-        }
+        let heap = IntervalHeap::with_capacity(readers.len());
+        Self { readers, heap }
     }
 
     fn advance_reader(&mut self, idx: usize) -> crate::Result<()> {
