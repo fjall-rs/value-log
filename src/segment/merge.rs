@@ -6,6 +6,15 @@ use crate::{id::SegmentId, value::UserKey, Compressor, SegmentReader, UserValue}
 use interval_heap::IntervalHeap;
 use std::cmp::Reverse;
 
+macro_rules! fail_iter {
+    ($e:expr) => {
+        match $e {
+            Ok(v) => v,
+            Err(e) => return Some(Err(e.into())),
+        }
+    };
+}
+
 type IteratorIndex = usize;
 
 #[derive(Debug)]
@@ -83,22 +92,16 @@ impl<C: Compressor + Clone> Iterator for MergeReader<C> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.heap.is_empty() {
-            if let Err(e) = self.push_next() {
-                return Some(Err(e));
-            };
+            fail_iter!(self.push_next());
         }
 
         if let Some(head) = self.heap.pop_min() {
-            if let Err(e) = self.advance_reader(head.index) {
-                return Some(Err(e));
-            }
+            fail_iter!(self.advance_reader(head.index));
 
             // Discard old items
             while let Some(next) = self.heap.pop_min() {
                 if next.key == head.key {
-                    if let Err(e) = self.advance_reader(next.index) {
-                        return Some(Err(e));
-                    }
+                    fail_iter!(self.advance_reader(next.index));
                 } else {
                     // Reached next user key now
                     // Push back non-conflicting item and exit
