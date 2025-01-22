@@ -26,7 +26,15 @@ impl AsRef<[u8]> for Slice {
 
 impl From<&[u8]> for Slice {
     fn from(value: &[u8]) -> Self {
-        Self(value.into())
+        #[cfg(not(feature = "bytes"))]
+        {
+            Self(byteview::ByteView::new(value))
+        }
+
+        #[cfg(feature = "bytes")]
+        {
+            Self(bytes::Bytes::from(value.to_vec()))
+        }
     }
 }
 
