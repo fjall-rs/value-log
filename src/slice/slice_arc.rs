@@ -18,6 +18,12 @@ impl Slice {
 
     #[doc(hidden)]
     #[must_use]
+    pub fn empty() -> Self {
+        Self(ByteView::new(&[]))
+    }
+
+    #[doc(hidden)]
+    #[must_use]
     pub fn slice(&self, range: impl std::ops::RangeBounds<usize>) -> Self {
         Self(self.0.slice(range))
     }
@@ -28,6 +34,7 @@ impl Slice {
         Self(ByteView::with_size(len))
     }
 
+    /// Constructs a [`Slice`] from an I/O reader by pulling in `len` bytes.
     #[doc(hidden)]
     pub fn from_reader<R: std::io::Read>(reader: &mut R, len: usize) -> std::io::Result<Self> {
         let view = ByteView::from_reader(reader, len)?;

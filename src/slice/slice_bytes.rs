@@ -18,10 +18,24 @@ impl Slice {
 
     #[doc(hidden)]
     #[must_use]
+    pub fn empty() -> Self {
+        Self(Bytes::from_static(&[]))
+    }
+
+    #[doc(hidden)]
+    #[must_use]
     pub fn slice(&self, range: impl std::ops::RangeBounds<usize>) -> Self {
         Self(self.0.slice(range))
     }
 
+    #[must_use]
+    #[doc(hidden)]
+    pub fn with_size(len: usize) -> Self {
+        let bytes = vec![0; len];
+        Self(Bytes::from(bytes))
+    }
+
+    /// Constructs a [`Slice`] from an I/O reader by pulling in `len` bytes.
     #[doc(hidden)]
     pub fn from_reader<R: std::io::Read>(reader: &mut R, len: usize) -> std::io::Result<Self> {
         let mut builder = BytesMut::zeroed(len);
