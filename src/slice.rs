@@ -3,7 +3,7 @@
 // (found in the LICENSE-* files in the repository)
 
 #[cfg(not(feature = "bytes"))]
-mod slice_arc;
+mod slice_default;
 
 #[cfg(feature = "bytes")]
 mod slice_bytes;
@@ -13,10 +13,10 @@ use std::{
     sync::Arc,
 };
 
-#[cfg(not(feature = "bytes"))]
-pub use slice_arc::Slice;
 #[cfg(feature = "bytes")]
 pub use slice_bytes::Slice;
+#[cfg(not(feature = "bytes"))]
+pub use slice_default::Slice;
 
 impl AsRef<[u8]> for Slice {
     fn as_ref(&self) -> &[u8] {
@@ -35,6 +35,12 @@ impl From<&[u8]> for Slice {
         {
             Self(bytes::Bytes::from(value.to_vec()))
         }
+    }
+}
+
+impl From<Arc<[u8]>> for Slice {
+    fn from(value: Arc<[u8]>) -> Self {
+        Self::from(&*value)
     }
 }
 

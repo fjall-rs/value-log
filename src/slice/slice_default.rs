@@ -3,7 +3,6 @@
 // (found in the LICENSE-* files in the repository)
 
 use byteview::ByteView;
-use std::sync::Arc;
 
 /// An immutable byte slice that can be cloned without additional heap allocation
 #[derive(Debug, Clone, Eq, Hash, Ord)]
@@ -42,23 +41,16 @@ impl Slice {
     }
 }
 
-// Arc::from<Vec<T>> is specialized
+// Arc::from<Vec<u8>> is specialized
 impl From<Vec<u8>> for Slice {
     fn from(value: Vec<u8>) -> Self {
         Self(ByteView::from(value))
     }
 }
 
-// Arc::from<Vec<T>> is specialized
+// Arc::from<Vec<String>> is specialized
 impl From<String> for Slice {
     fn from(value: String) -> Self {
         Self(ByteView::from(value.into_bytes()))
-    }
-}
-
-// direct conversion
-impl From<Arc<[u8]>> for Slice {
-    fn from(value: Arc<[u8]>) -> Self {
-        Self::from(&*value)
     }
 }

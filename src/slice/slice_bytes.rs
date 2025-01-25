@@ -3,7 +3,6 @@
 // (found in the LICENSE-* files in the repository)
 
 use bytes::{Bytes, BytesMut};
-use std::sync::Arc;
 
 /// An immutable byte slice that can be cloned without additional heap allocation
 #[derive(Debug, Clone, Eq, Hash, Ord)]
@@ -67,12 +66,5 @@ impl From<Vec<u8>> for Slice {
 impl From<String> for Slice {
     fn from(value: String) -> Self {
         Self(Bytes::from(value))
-    }
-}
-
-// Needed because slice_arc specializes this impl
-impl From<Arc<[u8]>> for Slice {
-    fn from(value: Arc<[u8]>) -> Self {
-        Self::new(value.as_ref())
     }
 }
