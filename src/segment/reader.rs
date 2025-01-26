@@ -93,6 +93,7 @@ impl<C: Compressor + Clone> Iterator for Reader<C> {
         let val_len = fail_iter!(self.inner.read_u32::<BigEndian>());
         let val = match &self.compression {
             Some(compressor) => {
+                // TODO: https://github.com/PSeitz/lz4_flex/issues/166
                 let mut val = vec![0; val_len as usize];
                 fail_iter!(self.inner.read_exact(&mut val));
                 Slice::from(fail_iter!(compressor.decompress(&val)))
