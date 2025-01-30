@@ -5,6 +5,8 @@
 use byteview::ByteView;
 
 /// An immutable byte slice that can be cloned without additional heap allocation
+///
+/// There is no guarantee of any sort of alignment for zero-copy (de)serialization.
 #[derive(Debug, Clone, Eq, Hash, Ord)]
 pub struct Slice(pub(super) ByteView);
 
