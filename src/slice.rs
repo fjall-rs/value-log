@@ -3,7 +3,7 @@
 // (found in the LICENSE-* files in the repository)
 
 #[cfg(not(feature = "bytes"))]
-mod slice_arc;
+mod slice_default;
 
 #[cfg(feature = "bytes")]
 mod slice_bytes;
@@ -13,10 +13,10 @@ use std::{
     sync::Arc,
 };
 
-#[cfg(not(feature = "bytes"))]
-pub use slice_arc::Slice;
 #[cfg(feature = "bytes")]
 pub use slice_bytes::Slice;
+#[cfg(not(feature = "bytes"))]
+pub use slice_default::Slice;
 
 impl AsRef<[u8]> for Slice {
     fn as_ref(&self) -> &[u8] {
@@ -26,7 +26,21 @@ impl AsRef<[u8]> for Slice {
 
 impl From<&[u8]> for Slice {
     fn from(value: &[u8]) -> Self {
-        Self::new(value)
+        #[cfg(not(feature = "bytes"))]
+        {
+            Self(byteview::ByteView::new(value))
+        }
+
+        #[cfg(feature = "bytes")]
+        {
+            Self(bytes::Bytes::from(value.to_vec()))
+        }
+    }
+}
+
+impl From<Arc<[u8]>> for Slice {
+    fn from(value: Arc<[u8]>) -> Self {
+        Self::from(&*value)
     }
 }
 
@@ -180,6 +194,7 @@ mod serde {
 mod tests {
     use super::Slice;
     use std::{fmt::Debug, sync::Arc};
+    use test_log::test;
 
     fn assert_slice_handles<T>(v: T)
     where
@@ -190,6 +205,17 @@ mod tests {
         let slice: Slice = v.clone().into();
         assert_eq!(slice, v, "slice_arc: {slice:?}, v: {v:?}");
         assert!(slice >= v, "slice_arc: {slice:?}, v: {v:?}");
+    }
+
+    #[test]
+    fn slice_empty() {
+        assert_eq!(Slice::empty(), []);
+    }
+
+    #[test]
+    fn slice_with_size() {
+        assert_eq!(Slice::with_size(5), [0, 0, 0, 0, 0]);
+        assert_eq!(Slice::with_size(50), [0; 50]);
     }
 
     /// This test verifies that we can create a `Slice` from various types and compare a `Slice` with them.

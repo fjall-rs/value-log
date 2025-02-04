@@ -3,10 +3,17 @@
 // (found in the LICENSE-* files in the repository)
 
 use crate::{id::SegmentId, value::UserKey, Compressor, SegmentReader, UserValue};
+use interval_heap::IntervalHeap;
 use std::cmp::Reverse;
 
-// TODO: replace with MinHeap...
-use min_max_heap::MinMaxHeap;
+macro_rules! fail_iter {
+    ($e:expr) => {
+        match $e {
+            Ok(v) => v,
+            Err(e) => return Some(Err(e.into())),
+        }
+    };
+}
 
 type IteratorIndex = usize;
 
@@ -42,16 +49,14 @@ impl Ord for IteratorValue {
 #[allow(clippy::module_name_repetitions)]
 pub struct MergeReader<C: Compressor + Clone> {
     readers: Vec<SegmentReader<C>>,
-    heap: MinMaxHeap<IteratorValue>,
+    heap: IntervalHeap<IteratorValue>,
 }
 
 impl<C: Compressor + Clone> MergeReader<C> {
     /// Initializes a new merging reader
     pub fn new(readers: Vec<SegmentReader<C>>) -> Self {
-        Self {
-            readers,
-            heap: MinMaxHeap::new(),
-        }
+        let heap = IntervalHeap::with_capacity(readers.len());
+        Self { readers, heap }
     }
 
     fn advance_reader(&mut self, idx: usize) -> crate::Result<()> {
@@ -87,22 +92,16 @@ impl<C: Compressor + Clone> Iterator for MergeReader<C> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.heap.is_empty() {
-            if let Err(e) = self.push_next() {
-                return Some(Err(e));
-            };
+            fail_iter!(self.push_next());
         }
 
         if let Some(head) = self.heap.pop_min() {
-            if let Err(e) = self.advance_reader(head.index) {
-                return Some(Err(e));
-            }
+            fail_iter!(self.advance_reader(head.index));
 
             // Discard old items
             while let Some(next) = self.heap.pop_min() {
                 if next.key == head.key {
-                    if let Err(e) = self.advance_reader(next.index) {
-                        return Some(Err(e));
-                    }
+                    fail_iter!(self.advance_reader(next.index));
                 } else {
                     // Reached next user key now
                     // Push back non-conflicting item and exit

@@ -3,13 +3,22 @@
 // (found in the LICENSE-* files in the repository)
 
 use super::{meta::METADATA_HEADER_MAGIC, writer::BLOB_HEADER_MAGIC};
-use crate::{coding::DecodeError, id::SegmentId, value::UserKey, Compressor, UserValue};
+use crate::{coding::DecodeError, id::SegmentId, value::UserKey, Compressor, Slice, UserValue};
 use byteorder::{BigEndian, ReadBytesExt};
 use std::{
     fs::File,
     io::{BufReader, Read, Seek},
     path::Path,
 };
+
+macro_rules! fail_iter {
+    ($e:expr) => {
+        match $e {
+            Ok(v) => v,
+            Err(e) => return Some(Err(e.into())),
+        }
+    };
+}
 
 /// Reads through a segment in order.
 pub struct Reader<C: Compressor + Clone> {
@@ -62,10 +71,7 @@ impl<C: Compressor + Clone> Iterator for Reader<C> {
 
         {
             let mut buf = [0; BLOB_HEADER_MAGIC.len()];
-
-            if let Err(e) = self.inner.read_exact(&mut buf) {
-                return Some(Err(e.into()));
-            };
+            fail_iter!(self.inner.read_exact(&mut buf));
 
             if buf == METADATA_HEADER_MAGIC {
                 self.is_terminated = true;
@@ -79,54 +85,26 @@ impl<C: Compressor + Clone> Iterator for Reader<C> {
             }
         }
 
-        let checksum = match self.inner.read_u64::<BigEndian>() {
-            Ok(v) => v,
-            Err(e) => {
-                if e.kind() == std::io::ErrorKind::UnexpectedEof {
-                    return None;
-                }
-                return Some(Err(e.into()));
-            }
-        };
+        let checksum = fail_iter!(self.inner.read_u64::<BigEndian>());
 
-        let key_len = match self.inner.read_u16::<BigEndian>() {
-            Ok(v) => v,
-            Err(e) => {
-                if e.kind() == std::io::ErrorKind::UnexpectedEof {
-                    return None;
-                }
-                return Some(Err(e.into()));
-            }
-        };
+        let key_len = fail_iter!(self.inner.read_u16::<BigEndian>());
+        let key = fail_iter!(Slice::from_reader(&mut self.inner, key_len as usize));
 
-        let mut key = vec![0; key_len.into()];
-        if let Err(e) = self.inner.read_exact(&mut key) {
-            return Some(Err(e.into()));
-        };
-
-        let val_len = match self.inner.read_u32::<BigEndian>() {
-            Ok(v) => v,
-            Err(e) => {
-                if e.kind() == std::io::ErrorKind::UnexpectedEof {
-                    return None;
-                }
-                return Some(Err(e.into()));
-            }
-        };
-
-        let mut val = vec![0; val_len as usize];
-        if let Err(e) = self.inner.read_exact(&mut val) {
-            return Some(Err(e.into()));
-        };
-
+        let val_len = fail_iter!(self.inner.read_u32::<BigEndian>());
         let val = match &self.compression {
-            Some(compressor) => match compressor.decompress(&val) {
-                Ok(val) => val,
-                Err(e) => return Some(Err(e)),
-            },
-            None => val,
+            Some(compressor) => {
+                // TODO: https://github.com/PSeitz/lz4_flex/issues/166
+                let mut val = vec![0; val_len as usize];
+                fail_iter!(self.inner.read_exact(&mut val));
+                Slice::from(fail_iter!(compressor.decompress(&val)))
+            }
+            None => {
+                // NOTE: When not using compression, we can skip
+                // the intermediary heap allocation and read directly into a Slice
+                fail_iter!(Slice::from_reader(&mut self.inner, val_len as usize))
+            }
         };
 
-        Some(Ok((key.into(), val.into(), checksum)))
+        Some(Ok((key, val, checksum)))
     }
 }
