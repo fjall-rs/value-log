@@ -2,11 +2,11 @@
 // This source code is licensed under both the Apache 2.0 and MIT License
 // (found in the LICENSE-* files in the repository)
 
-use std::sync::Arc;
-
 use bytes::{Bytes, BytesMut};
 
 /// An immutable byte slice that can be cloned without additional heap allocation
+///
+/// There is no guarantee of any sort of alignment for zero-copy (de)serialization.
 #[derive(Debug, Clone, Eq, Hash, Ord)]
 pub struct Slice(pub(super) Bytes);
 
@@ -17,6 +17,26 @@ impl Slice {
         Self(Bytes::copy_from_slice(bytes))
     }
 
+    #[doc(hidden)]
+    #[must_use]
+    pub fn empty() -> Self {
+        Self(Bytes::from_static(&[]))
+    }
+
+    #[doc(hidden)]
+    #[must_use]
+    pub fn slice(&self, range: impl std::ops::RangeBounds<usize>) -> Self {
+        Self(self.0.slice(range))
+    }
+
+    #[must_use]
+    #[doc(hidden)]
+    pub fn with_size(len: usize) -> Self {
+        let bytes = vec![0; len];
+        Self(Bytes::from(bytes))
+    }
+
+    /// Constructs a [`Slice`] from an I/O reader by pulling in `len` bytes.
     #[doc(hidden)]
     pub fn from_reader<R: std::io::Read>(reader: &mut R, len: usize) -> std::io::Result<Self> {
         let mut builder = BytesMut::zeroed(len);
@@ -48,12 +68,5 @@ impl From<Vec<u8>> for Slice {
 impl From<String> for Slice {
     fn from(value: String) -> Self {
         Self(Bytes::from(value))
-    }
-}
-
-// Needed because slice_arc specializes this impl
-impl From<Arc<[u8]>> for Slice {
-    fn from(value: Arc<[u8]>) -> Self {
-        Self::new(value.as_ref())
     }
 }
