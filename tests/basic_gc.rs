@@ -1,5 +1,8 @@
 use test_log::test;
-use value_log::{Compressor, Config, IndexWriter, MockIndex, MockIndexWriter, ValueLog};
+use value_log::{
+    BlobCache, Compressor, Config, IndexWriter, MockIndex, MockIndexWriter, UserValue, ValueHandle,
+    ValueLog, ValueLogId,
+};
 
 #[derive(Clone, Default)]
 struct NoCompressor;
@@ -14,6 +17,17 @@ impl Compressor for NoCompressor {
     }
 }
 
+#[derive(Clone)]
+struct NoCacher;
+
+impl BlobCache for NoCacher {
+    fn get(&self, _: ValueLogId, _: &ValueHandle) -> Option<UserValue> {
+        None
+    }
+
+    fn insert(&self, _: ValueLogId, _: &ValueHandle, _: UserValue) {}
+}
+
 #[test]
 fn basic_gc() -> value_log::Result<()> {
     let folder = tempfile::tempdir()?;
@@ -21,7 +35,7 @@ fn basic_gc() -> value_log::Result<()> {
 
     let index = MockIndex::default();
 
-    let value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default())?;
+    let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher))?;
 
     {
         let items = ["a", "b", "c", "d", "e"];
