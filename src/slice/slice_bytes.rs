@@ -39,9 +39,9 @@ impl Slice {
     /// Constructs a [`Slice`] from an I/O reader by pulling in `len` bytes.
     #[doc(hidden)]
     pub fn from_reader<R: std::io::Read>(reader: &mut R, len: usize) -> std::io::Result<Self> {
-        let mut builder = BytesMut::zeroed(len);
+        let mut builder = BytesMut::with_capacity(len);
         reader.read_exact(&mut builder)?;
-        Ok(builder.freeze().into())
+        Ok(Self(builder.freeze()))
     }
 }
 
