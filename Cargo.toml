@@ -2,7 +2,7 @@
 name = "value-log"
 description = "Value log implementation for key-value separated LSM storage"
 license = "MIT OR Apache-2.0"
-version = "1.5.0"
+version = "1.5.1"
 edition = "2021"
 rust-version = "1.74.0"
 readme = "README.md"
@@ -24,7 +24,7 @@ bytes = ["dep:bytes"]
 [dependencies]
 bytes = { version = "1", optional = true }
 byteorder = "1.5.0"
-byteview = "0.5.2"
+byteview = "0.5.3"
 interval-heap = "0.0.5"
 log = "0.4.22"
 path-absolutize = "3.1.1"
