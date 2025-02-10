@@ -56,3 +56,9 @@ impl From<String> for Slice {
         Self(ByteView::from(value.into_bytes()))
     }
 }
+
+impl From<ByteView> for Slice {
+    fn from(value: ByteView) -> Self {
+        Self(value)
+    }
+}
