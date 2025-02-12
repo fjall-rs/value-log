@@ -62,3 +62,9 @@ impl From<ByteView> for Slice {
         Self(value)
     }
 }
+
+impl From<Slice> for ByteView {
+    fn from(value: Slice) -> Self {
+        value.0
+    }
+}
