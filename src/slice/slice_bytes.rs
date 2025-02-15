@@ -2,7 +2,8 @@
 // This source code is licensed under both the Apache 2.0 and MIT License
 // (found in the LICENSE-* files in the repository)
 
-use bytes::{Bytes, BytesMut};
+use bytes::{BufMut, Bytes, BytesMut};
+use std::io::Read;
 
 /// An immutable byte slice that can be cloned without additional heap allocation
 ///
@@ -39,9 +40,34 @@ impl Slice {
     /// Constructs a [`Slice`] from an I/O reader by pulling in `len` bytes.
     #[doc(hidden)]
     pub fn from_reader<R: std::io::Read>(reader: &mut R, len: usize) -> std::io::Result<Self> {
-        let mut builder = BytesMut::zeroed(len);
-        reader.read_exact(&mut builder)?;
-        Ok(Self(builder.freeze()))
+        // Use `BytesMut::with_capacity` + `BytesMut::writer` in order to skip
+        // zeroing out the buffer before reading
+        let mut writer = BytesMut::with_capacity(len).writer();
+        let mut taker = reader.take(len as u64);
+
+        let n = std::io::copy(&mut taker, &mut writer)?;
+        if n != len as u64 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "failed to read enough bytes",
+            ));
+        }
+
+        Ok(Self(writer.into_inner().freeze()))
+
+        // ALTERNATIVE unsafe version:
+
+        // let mut builder = BytesMut::with_capacity(len);
+
+        // // SAFETY: we just allocated `len` bytes, and `read_exact` will fail if it
+        // // doesn't fill the buffer
+        // unsafe {
+        //     builder.set_len(len);
+        // }
+
+        // reader.read_exact(&mut builder)?;
+
+        // Ok(Self(builder.freeze()))
     }
 }
 
