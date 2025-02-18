@@ -29,6 +29,7 @@ impl Slice {
         Self(self.0.slice(range))
     }
 
+    // TODO: change to unzeroed and provide a _zeroed method instead
     #[must_use]
     #[doc(hidden)]
     pub fn with_size(len: usize) -> Self {
