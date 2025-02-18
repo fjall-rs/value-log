@@ -1,6 +1,7 @@
 use test_log::test;
 use value_log::{
-    Compressor, Config, IndexReader, IndexWriter, MockIndex, MockIndexWriter, ValueLog,
+    BlobCache, Compressor, Config, IndexReader, IndexWriter, MockIndex, MockIndexWriter, UserValue,
+    ValueHandle, ValueLog, ValueLogId,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -15,6 +16,17 @@ impl Compressor for Lz4Compressor {
     }
 }
 
+#[derive(Clone)]
+struct NoCacher;
+
+impl BlobCache for NoCacher {
+    fn get(&self, _: ValueLogId, _: &ValueHandle) -> Option<UserValue> {
+        None
+    }
+
+    fn insert(&self, _: ValueLogId, _: &ValueHandle, _: UserValue) {}
+}
+
 #[test]
 fn compression() -> value_log::Result<()> {
     let folder = tempfile::tempdir()?;
@@ -22,7 +34,7 @@ fn compression() -> value_log::Result<()> {
 
     let index = MockIndex::default();
 
-    let value_log = ValueLog::open(vl_path, Config::<Lz4Compressor>::default())?;
+    let value_log = ValueLog::open(vl_path, Config::<_, Lz4Compressor>::new(NoCacher))?;
 
     let mut index_writer = MockIndexWriter(index.clone());
     let mut writer = value_log.get_writer()?;

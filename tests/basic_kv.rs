@@ -1,6 +1,7 @@
 use test_log::test;
 use value_log::{
-    Compressor, Config, IndexWriter, KeyRange, MockIndex, MockIndexWriter, Slice, ValueLog,
+    BlobCache, Compressor, Config, IndexWriter, KeyRange, MockIndex, MockIndexWriter, Slice,
+    UserValue, ValueHandle, ValueLog, ValueLogId,
 };
 
 #[derive(Clone, Default)]
@@ -16,6 +17,17 @@ impl Compressor for NoCompressor {
     }
 }
 
+#[derive(Clone)]
+struct NoCacher;
+
+impl BlobCache for NoCacher {
+    fn get(&self, _: ValueLogId, _: &ValueHandle) -> Option<UserValue> {
+        None
+    }
+
+    fn insert(&self, _: ValueLogId, _: &ValueHandle, _: UserValue) {}
+}
+
 #[test]
 fn basic_kv() -> value_log::Result<()> {
     let folder = tempfile::tempdir()?;
@@ -26,7 +38,7 @@ fn basic_kv() -> value_log::Result<()> {
     let items = ["a", "b", "c", "d", "e"];
 
     {
-        let value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default())?;
+        let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher))?;
 
         {
             let mut index_writer = MockIndexWriter(index.clone());
@@ -49,7 +61,7 @@ fn basic_kv() -> value_log::Result<()> {
     }
 
     {
-        let value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default())?;
+        let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher))?;
 
         assert_eq!(1, value_log.segment_count());
 
