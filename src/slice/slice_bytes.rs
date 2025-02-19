@@ -37,6 +37,8 @@ impl Slice {
     }
 
     /// Constructs a [`Slice`] from an I/O reader by pulling in `len` bytes.
+    ///
+    /// The reader may not read the existing buffer.
     #[doc(hidden)]
     pub fn from_reader<R: std::io::Read>(reader: &mut R, len: usize) -> std::io::Result<Self> {
         // Use `with_capacity` & `set_len`` to avoid zeroing the buffer
@@ -49,6 +51,11 @@ impl Slice {
             builder.set_len(len);
         }
 
+        /// SAFETY: Normally, read_exact over an uninitialized buffer is UB,
+        /// however we know that in lsm-tree etc. only I/O readers or cursors over Vecs are used
+        /// so it's safe
+        ///
+        /// The safe API is unstable: https://github.com/rust-lang/rust/issues/78485
         reader.read_exact(&mut builder)?;
 
         Ok(Self(builder.freeze()))
