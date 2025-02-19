@@ -91,7 +91,6 @@
 
 #![doc(html_logo_url = "https://raw.githubusercontent.com/fjall-rs/value-log/main/logo.png")]
 #![doc(html_favicon_url = "https://raw.githubusercontent.com/fjall-rs/value-log/main/logo.png")]
-#![forbid(unsafe_code)]
 #![deny(clippy::all, missing_docs, clippy::cargo)]
 #![deny(clippy::unwrap_used)]
 #![deny(clippy::indexing_slicing)]
@@ -99,6 +98,8 @@
 #![warn(clippy::expect_used)]
 #![allow(clippy::missing_const_for_fn)]
 #![warn(clippy::multiple_crate_versions)]
+// the bytes feature uses unsafe to improve from_reader performance
+#![cfg_attr(not(feature = "bytes"), forbid(unsafe_code))]
 
 mod blob_cache;
 mod coding;
