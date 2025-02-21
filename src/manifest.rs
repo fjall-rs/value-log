@@ -66,7 +66,7 @@ impl<C: Compressor + Clone> SegmentManifest<C> {
         for dirent in std::fs::read_dir(folder)? {
             let dirent = dirent?;
 
-            if dirent.file_type()?.is_dir() {
+            if dirent.file_type()?.is_file() {
                 let segment_id = dirent
                     .file_name()
                     .to_str()
@@ -76,7 +76,7 @@ impl<C: Compressor + Clone> SegmentManifest<C> {
 
                 if !registered_ids.contains(&segment_id) {
                     log::trace!("Deleting unfinished vLog segment {segment_id}");
-                    std::fs::remove_dir_all(dirent.path())?;
+                    std::fs::remove_file(dirent.path())?;
                 }
             }
         }
