@@ -2,7 +2,8 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use rand::{Rng, RngCore};
 use std::sync::Arc;
 use value_log::{
-    BlobCache, Compressor, Config, IndexReader, IndexWriter, MockIndex, MockIndexWriter, ValueLog,
+    BlobCache, Compressor, Config, IndexReader, IndexWriter, MockIndex, MockIndexWriter, UserValue,
+    ValueHandle, ValueLog, ValueLogId,
 };
 
 #[derive(Clone, Default)]
@@ -18,6 +19,17 @@ impl Compressor for NoCompressor {
     }
 }
 
+#[derive(Clone)]
+struct NoCacher;
+
+impl BlobCache for NoCacher {
+    fn get(&self, _: ValueLogId, _: &ValueHandle) -> Option<UserValue> {
+        None
+    }
+
+    fn insert(&self, _: ValueLogId, _: &ValueHandle, _: UserValue) {}
+}
+
 fn prefetch(c: &mut Criterion) {
     let mut group = c.benchmark_group("prefetch range");
 
@@ -30,7 +42,7 @@ fn prefetch(c: &mut Criterion) {
     let folder = tempfile::tempdir().unwrap();
     let vl_path = folder.path();
 
-    let value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default()).unwrap();
+    let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher)).unwrap();
 
     let mut writer = value_log.get_writer().unwrap();
 
@@ -113,12 +125,7 @@ fn load_value(c: &mut Criterion) {
         let folder = tempfile::tempdir().unwrap();
         let vl_path = folder.path();
 
-        let value_log = ValueLog::open(
-            vl_path,
-            Config::<NoCompressor>::default()
-                .blob_cache(Arc::new(BlobCache::with_capacity_bytes(0))),
-        )
-        .unwrap();
+        let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher)).unwrap();
 
         let mut writer = value_log.get_writer().unwrap();
 
@@ -147,59 +154,7 @@ fn load_value(c: &mut Criterion) {
             let key = size.to_string();
             let vhandle = index.get(key.as_bytes()).unwrap().unwrap();
 
-            group.bench_function(format!("{size} bytes (uncached)"), |b| {
-                b.iter(|| {
-                    value_log.get(&vhandle).unwrap().unwrap();
-                })
-            });
-        }
-    }
-
-    {
-        let index = MockIndex::default();
-        let mut index_writer = MockIndexWriter(index.clone());
-
-        let folder = tempfile::tempdir().unwrap();
-        let vl_path = folder.path();
-
-        let value_log = ValueLog::open(
-            vl_path,
-            Config::<NoCompressor>::default()
-                .blob_cache(Arc::new(BlobCache::with_capacity_bytes(64 * 1_024 * 1_024))),
-        )
-        .unwrap();
-
-        let mut writer = value_log.get_writer().unwrap();
-
-        let mut rng = rand::thread_rng();
-
-        for size in sizes {
-            let key = size.to_string();
-
-            let mut data = vec![0u8; size];
-            rng.fill_bytes(&mut data);
-
-            index_writer
-                .insert_indirect(
-                    key.as_bytes(),
-                    writer.get_next_value_handle(),
-                    data.len() as u32,
-                )
-                .unwrap();
-
-            writer.write(key.as_bytes(), &data).unwrap();
-        }
-
-        value_log.register_writer(writer).unwrap();
-
-        for size in sizes {
-            let key = size.to_string();
-            let vhandle = index.get(key.as_bytes()).unwrap().unwrap();
-
-            // NOTE: Warm up cache
-            value_log.get(&vhandle).unwrap().unwrap();
-
-            group.bench_function(format!("{size} bytes (cached)"), |b| {
+            group.bench_function(format!("{size} bytes"), |b| {
                 b.iter(|| {
                     value_log.get(&vhandle).unwrap().unwrap();
                 })
