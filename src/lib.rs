@@ -98,7 +98,8 @@
 #![warn(clippy::expect_used)]
 #![allow(clippy::missing_const_for_fn)]
 #![warn(clippy::multiple_crate_versions)]
-// the bytes feature uses unsafe to improve from_reader performance
+// the bytes feature uses unsafe to improve from_reader performance; so we need to relax this lint
+#![cfg_attr(feature = "bytes", deny(unsafe_code))]
 #![cfg_attr(not(feature = "bytes"), forbid(unsafe_code))]
 
 mod blob_cache;
