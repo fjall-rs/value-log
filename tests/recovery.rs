@@ -84,25 +84,30 @@ fn basic_recovery() -> value_log::Result<()> {
 }
 
 #[test]
-fn delete_unfinished_segment_folders() -> value_log::Result<()> {
+fn recovery_delete_unfinished() -> value_log::Result<()> {
     let folder = tempfile::tempdir()?;
-
     let vl_path = folder.path();
-    std::fs::create_dir_all(vl_path)?;
-
-    let mock_path = vl_path.join("segments").join("463298");
-    std::fs::create_dir_all(&mock_path)?;
-    assert!(mock_path.try_exists()?);
 
     {
-        let _value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default())?;
-        assert!(mock_path.try_exists()?);
+        let value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default())?;
+
+        let mut writer = value_log.get_writer()?;
+        writer.write("a", "a")?;
+        value_log.register_writer(writer)?;
+    }
+
+    let faux_segment = vl_path.join("segments").join("73");
+    {
+        std::fs::File::create(&faux_segment)?;
+        assert!(faux_segment.try_exists()?);
     }
 
     {
-        let _value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default())?;
-        assert!(!mock_path.try_exists()?);
+        let value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default())?;
+        assert_eq!(1, value_log.segment_count());
     }
+
+    assert!(!faux_segment.try_exists()?);
 
     Ok(())
 }

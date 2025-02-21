@@ -66,6 +66,11 @@ impl<C: Compressor + Clone> SegmentManifest<C> {
         for dirent in std::fs::read_dir(folder)? {
             let dirent = dirent?;
 
+            // IMPORTANT: Skip .DS_Store files when using MacOS
+            if dirent.file_name() == ".DS_Store" {
+                continue;
+            }
+
             if dirent.file_type()?.is_file() {
                 let segment_id = dirent
                     .file_name()
