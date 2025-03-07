@@ -2,7 +2,7 @@
 name = "value-log"
 description = "Value log implementation for key-value separated LSM storage"
 license = "MIT OR Apache-2.0"
-version = "1.5.5"
+version = "1.5.6"
 edition = "2021"
 rust-version = "1.74.0"
 readme = "README.md"
