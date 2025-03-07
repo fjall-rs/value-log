@@ -11,6 +11,32 @@ pub enum EncodeError {
     Io(std::io::Error),
 }
 
+impl std::fmt::Display for EncodeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "EncodeError({})",
+            match self {
+                Self::Io(e) => e.to_string(),
+            }
+        )
+    }
+}
+
+impl From<std::io::Error> for EncodeError {
+    fn from(value: std::io::Error) -> Self {
+        Self::Io(value)
+    }
+}
+
+impl std::error::Error for EncodeError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io(e) => Some(e),
+        }
+    }
+}
+
 /// Error during deserialization
 #[derive(Debug)]
 pub enum DecodeError {
@@ -26,15 +52,31 @@ pub enum DecodeError {
     InvalidHeader(&'static str),
 }
 
-impl From<std::io::Error> for EncodeError {
-    fn from(value: std::io::Error) -> Self {
-        Self::Io(value)
+impl std::fmt::Display for DecodeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "DecodeError({})",
+            match self {
+                Self::Io(e) => e.to_string(),
+                e => format!("{e:?}"),
+            }
+        )
     }
 }
 
 impl From<std::io::Error> for DecodeError {
     fn from(value: std::io::Error) -> Self {
         Self::Io(value)
+    }
+}
+
+impl std::error::Error for DecodeError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io(e) => Some(e),
+            _ => None,
+        }
     }
 }
 
