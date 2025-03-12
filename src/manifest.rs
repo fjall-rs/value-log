@@ -159,6 +159,10 @@ impl<C: Compressor + Clone> SegmentManifest<C> {
             map
         };
 
+        if segments.len() < ids.len() {
+            return Err(crate::Error::Unrecoverable);
+        }
+
         Ok(Self(Arc::new(SegmentManifestInner {
             path: manifest_path,
             segments: RwLock::new(segments),

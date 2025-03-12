@@ -28,6 +28,9 @@ pub enum Error {
 
     /// Decompression failed
     Decompress,
+
+    /// Some required segments could not be recovered from disk
+    Unrecoverable,
     // TODO:
     // /// Checksum check failed
     // ChecksumMismatch,
@@ -45,7 +48,9 @@ impl std::error::Error for Error {
             Self::Io(e) => Some(e),
             Self::Encode(e) => Some(e),
             Self::Decode(e) => Some(e),
-            Self::Decompress | Self::InvalidVersion(_) | Self::Compress => None,
+            Self::Decompress | Self::InvalidVersion(_) | Self::Compress | Self::Unrecoverable => {
+                None
+            }
         }
     }
 }
