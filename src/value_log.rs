@@ -496,6 +496,46 @@ impl<C: Compressor + Clone> ValueLog<C> {
         self.rollover(&segment_ids, index_reader, index_writer)
     }
 
+    /// Atomically removes all data from the value log.
+    ///
+    /// If `prune_async` is set to `true`, the blob files will be removed from disk in a thread to avoid blocking.
+    pub fn clear(&self, prune_async: bool) -> crate::Result<()> {
+        let guard = self.rollover_guard.lock().expect("lock is poisoned");
+        let ids = self.manifest.list_segment_ids();
+        self.manifest.clear()?;
+        drop(guard);
+
+        if prune_async {
+            log::trace!("Pruning dropped blob files in thread: {ids:?}");
+
+            let path = self.path.clone();
+
+            std::thread::spawn(move || {
+                for id in ids {
+                    let path = path.join(SEGMENTS_FOLDER).join(id.to_string());
+
+                    if let Err(e) = std::fs::remove_file(&path) {
+                        log::error!("Could not free blob file at {path:?}: {e:?}");
+                    }
+                }
+            });
+        } else {
+            log::trace!("Pruning dropped blob files: {ids:?}");
+
+            for id in ids {
+                let path = self.path.join(SEGMENTS_FOLDER).join(id.to_string());
+
+                if let Err(e) = std::fs::remove_file(&path) {
+                    log::error!("Could not free blob file at {path:?}: {e:?}");
+                }
+            }
+        }
+
+        log::trace!("Successfully pruned all blob files");
+
+        Ok(())
+    }
+
     /// Rewrites some segments into new segment(s), blocking the caller
     /// until the operation is completely done.
     ///
