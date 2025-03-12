@@ -4,8 +4,7 @@
 
 use crate::{
     coding::{Decode, DecodeError, Encode, EncodeError},
-    value::UserKey,
-    Slice,
+    Slice, UserKey,
 };
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::{
