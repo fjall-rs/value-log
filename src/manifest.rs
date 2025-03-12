@@ -66,7 +66,12 @@ impl<C: Compressor + Clone> SegmentManifest<C> {
         for dirent in std::fs::read_dir(folder)? {
             let dirent = dirent?;
 
-            if dirent.file_type()?.is_dir() {
+            // IMPORTANT: Skip .DS_Store files when using MacOS
+            if dirent.file_name() == ".DS_Store" {
+                continue;
+            }
+
+            if dirent.file_type()?.is_file() {
                 let segment_id = dirent
                     .file_name()
                     .to_str()
@@ -76,7 +81,7 @@ impl<C: Compressor + Clone> SegmentManifest<C> {
 
                 if !registered_ids.contains(&segment_id) {
                     log::trace!("Deleting unfinished vLog segment {segment_id}");
-                    std::fs::remove_dir_all(dirent.path())?;
+                    std::fs::remove_file(dirent.path())?;
                 }
             }
         }
@@ -153,6 +158,10 @@ impl<C: Compressor + Clone> SegmentManifest<C> {
 
             map
         };
+
+        if segments.len() < ids.len() {
+            return Err(crate::Error::Unrecoverable);
+        }
 
         Ok(Self(Arc::new(SegmentManifestInner {
             path: manifest_path,

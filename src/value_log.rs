@@ -441,6 +441,7 @@ impl<BC: BlobCache, C: Compressor + Clone> ValueLog<BC, C> {
     /// # Errors
     ///
     /// Will return `Err` if an IO error occurs.
+    #[allow(clippy::significant_drop_tightening)]
     pub fn scan_for_stats(
         &self,
         iter: impl Iterator<Item = std::io::Result<(ValueHandle, u32)>>,
@@ -448,6 +449,7 @@ impl<BC: BlobCache, C: Compressor + Clone> ValueLog<BC, C> {
         let lock_guard = self.rollover_guard.lock().expect("lock is poisoned");
 
         let ids = self.manifest.list_segment_ids();
+
         let mut scanner = Scanner::new(iter, lock_guard, &ids);
         scanner.scan()?;
         let size_map = scanner.finish();
@@ -458,9 +460,11 @@ impl<BC: BlobCache, C: Compressor + Clone> ValueLog<BC, C> {
 
     #[doc(hidden)]
     pub fn get_reader(&self) -> crate::Result<MergeReader<C>> {
-        let segments = self.manifest.segments.read().expect("lock is poisoned");
-
-        let readers = segments
+        let readers = self
+            .manifest
+            .segments
+            .read()
+            .expect("lock is poisoned")
             .values()
             .map(|x| x.scan())
             .collect::<crate::Result<Vec<_>>>()?;

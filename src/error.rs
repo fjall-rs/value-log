@@ -28,6 +28,9 @@ pub enum Error {
 
     /// Decompression failed
     Decompress,
+
+    /// Some required segments could not be recovered from disk
+    Unrecoverable,
     // TODO:
     // /// Checksum check failed
     // ChecksumMismatch,
@@ -39,7 +42,18 @@ impl std::fmt::Display for Error {
     }
 }
 
-impl std::error::Error for Error {}
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io(e) => Some(e),
+            Self::Encode(e) => Some(e),
+            Self::Decode(e) => Some(e),
+            Self::Decompress | Self::InvalidVersion(_) | Self::Compress | Self::Unrecoverable => {
+                None
+            }
+        }
+    }
+}
 
 impl From<std::io::Error> for Error {
     fn from(value: std::io::Error) -> Self {

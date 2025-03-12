@@ -29,6 +29,7 @@ impl Slice {
         Self(self.0.slice(range))
     }
 
+    // TODO: change to unzeroed and provide a _zeroed method instead
     #[must_use]
     #[doc(hidden)]
     pub fn with_size(len: usize) -> Self {
@@ -54,5 +55,17 @@ impl From<Vec<u8>> for Slice {
 impl From<String> for Slice {
     fn from(value: String) -> Self {
         Self(ByteView::from(value.into_bytes()))
+    }
+}
+
+impl From<ByteView> for Slice {
+    fn from(value: ByteView) -> Self {
+        Self(value)
+    }
+}
+
+impl From<Slice> for ByteView {
+    fn from(value: Slice) -> Self {
+        value.0
     }
 }
