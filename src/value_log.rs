@@ -10,10 +10,9 @@ use crate::{
     path::absolute_path,
     scanner::{Scanner, SizeMap},
     segment::merge::MergeReader,
-    value::UserValue,
     version::Version,
     BlobCache, Compressor, Config, GcStrategy, IndexReader, SegmentReader, SegmentWriter,
-    ValueHandle,
+    UserValue, ValueHandle,
 };
 use std::{
     fs::File,

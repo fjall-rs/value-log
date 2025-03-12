@@ -2,7 +2,7 @@
 // This source code is licensed under both the Apache 2.0 and MIT License
 // (found in the LICENSE-* files in the repository)
 
-use crate::{value::UserValue, value_log::ValueLogId, ValueHandle};
+use crate::{value_log::ValueLogId, UserValue, ValueHandle};
 
 /// Blob cache, in which blobs are cached in-memory
 /// after being retrieved from disk
