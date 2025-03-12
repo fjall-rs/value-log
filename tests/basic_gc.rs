@@ -1,7 +1,9 @@
+mod common;
+
+use common::{MockIndex, MockIndexWriter};
 use test_log::test;
 use value_log::{
-    BlobCache, Compressor, Config, IndexWriter, MockIndex, MockIndexWriter, UserValue, ValueHandle,
-    ValueLog, ValueLogId,
+    BlobCache, Compressor, Config, IndexWriter, UserValue, ValueHandle, ValueLog, ValueLogId,
 };
 
 #[derive(Clone, Default)]

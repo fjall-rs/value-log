@@ -1,5 +1,5 @@
 use test_log::test;
-use value_log::{Compressor, Config, ValueLog};
+use value_log::{BlobCache, Compressor, Config, UserValue, ValueHandle, ValueLog, ValueLogId};
 
 #[derive(Clone, Default)]
 struct NoCompressor;
@@ -14,13 +14,24 @@ impl Compressor for NoCompressor {
     }
 }
 
+#[derive(Clone)]
+struct NoCacher;
+
+impl BlobCache for NoCacher {
+    fn get(&self, _: ValueLogId, _: &ValueHandle) -> Option<UserValue> {
+        None
+    }
+
+    fn insert(&self, _: ValueLogId, _: &ValueHandle, _: UserValue) {}
+}
+
 #[test]
 fn recovery_mac_ds_store() -> value_log::Result<()> {
     let folder = tempfile::tempdir()?;
     let vl_path = folder.path();
 
     {
-        let value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default())?;
+        let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher))?;
 
         let mut writer = value_log.get_writer()?;
         writer.write("a", "a")?;
@@ -32,7 +43,7 @@ fn recovery_mac_ds_store() -> value_log::Result<()> {
     assert!(ds_store.try_exists()?);
 
     {
-        let value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default())?;
+        let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher))?;
         assert_eq!(1, value_log.segment_count());
     }
     assert!(ds_store.try_exists()?);

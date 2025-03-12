@@ -61,7 +61,6 @@ mod id;
 mod index;
 mod key_range;
 mod manifest;
-mod mock;
 mod path;
 mod slice;
 
@@ -93,9 +92,6 @@ pub use {
 
 #[doc(hidden)]
 pub use segment::{reader::Reader as SegmentReader, Segment};
-
-#[doc(hidden)]
-pub use mock::{MockIndex, MockIndexWriter};
 
 #[doc(hidden)]
 pub use key_range::KeyRange;

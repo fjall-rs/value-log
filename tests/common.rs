@@ -2,11 +2,11 @@
 // This source code is licensed under both the Apache 2.0 and MIT License
 // (found in the LICENSE-* files in the repository)
 
-use crate::{value::UserKey, IndexReader, IndexWriter, ValueHandle};
 use std::{
     collections::BTreeMap,
     sync::{Arc, RwLock},
 };
+use value_log::{IndexReader, IndexWriter, UserKey, ValueHandle};
 
 type MockIndexInner = RwLock<BTreeMap<UserKey, (ValueHandle, u32)>>;
 
@@ -25,6 +25,7 @@ impl std::ops::Deref for MockIndex {
 
 impl MockIndex {
     /// Remove item
+    #[allow(unused)]
     pub fn remove(&self, key: &[u8]) {
         self.0.write().expect("lock is poisoned").remove(key);
     }

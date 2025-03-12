@@ -1,5 +1,10 @@
+mod common;
+
+use common::{MockIndex, MockIndexWriter};
 use test_log::test;
-use value_log::{Compressor, Config, IndexWriter, MockIndex, MockIndexWriter, ValueLog};
+use value_log::{
+    BlobCache, Compressor, Config, IndexWriter, UserValue, ValueHandle, ValueLog, ValueLogId,
+};
 
 #[derive(Clone, Default)]
 struct NoCompressor;
@@ -14,6 +19,17 @@ impl Compressor for NoCompressor {
     }
 }
 
+#[derive(Clone)]
+struct NoCacher;
+
+impl BlobCache for NoCacher {
+    fn get(&self, _: ValueLogId, _: &ValueHandle) -> Option<UserValue> {
+        None
+    }
+
+    fn insert(&self, _: ValueLogId, _: &ValueHandle, _: UserValue) {}
+}
+
 #[test]
 fn recovery_fail() -> value_log::Result<()> {
     let folder = tempfile::tempdir()?;
@@ -24,7 +40,7 @@ fn recovery_fail() -> value_log::Result<()> {
     let items = ["a", "b", "c", "d", "e"];
 
     {
-        let value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default())?;
+        let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher))?;
 
         for _ in 0..2 {
             let mut index_writer = MockIndexWriter(index.clone());
@@ -55,7 +71,7 @@ fn recovery_fail() -> value_log::Result<()> {
 
     {
         matches!(
-            ValueLog::open(vl_path, Config::<NoCompressor>::default()),
+            ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher)),
             Err(value_log::Error::Unrecoverable),
         );
     }
