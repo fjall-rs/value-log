@@ -1,23 +1,8 @@
 mod common;
 
-use common::{MockIndex, MockIndexWriter};
+use common::{MockIndex, MockIndexWriter, NoCacher, NoCompressor};
 use test_log::test;
-use value_log::{
-    BlobCache, Compressor, Config, IndexWriter, UserValue, ValueHandle, ValueLog, ValueLogId,
-};
-
-#[derive(Clone, Default)]
-struct NoCompressor;
-
-impl Compressor for NoCompressor {
-    fn compress(&self, bytes: &[u8]) -> value_log::Result<Vec<u8>> {
-        Ok(bytes.into())
-    }
-
-    fn decompress(&self, bytes: &[u8]) -> value_log::Result<Vec<u8>> {
-        Ok(bytes.into())
-    }
-}
+use value_log::{Config, IndexWriter, ValueHandle, ValueLog};
 
 #[allow(clippy::module_name_repetitions)]
 pub struct DebugIndexWriter;
@@ -30,17 +15,6 @@ impl IndexWriter for DebugIndexWriter {
     fn finish(&mut self) -> std::io::Result<()> {
         Err(std::io::Error::new(std::io::ErrorKind::Other, "Oh no"))
     }
-}
-
-#[derive(Clone)]
-struct NoCacher;
-
-impl BlobCache for NoCacher {
-    fn get(&self, _: ValueLogId, _: &ValueHandle) -> Option<UserValue> {
-        None
-    }
-
-    fn insert(&self, _: ValueLogId, _: &ValueHandle, _: UserValue) {}
 }
 
 #[test]

@@ -1,34 +1,8 @@
 mod common;
 
-use common::{MockIndex, MockIndexWriter};
+use common::{MockIndex, MockIndexWriter, NoCacher, NoCompressor};
 use test_log::test;
-use value_log::{
-    BlobCache, Compressor, Config, IndexWriter, UserValue, ValueHandle, ValueLog, ValueLogId,
-};
-
-#[derive(Clone, Default)]
-struct NoCompressor;
-
-impl Compressor for NoCompressor {
-    fn compress(&self, bytes: &[u8]) -> value_log::Result<Vec<u8>> {
-        Ok(bytes.into())
-    }
-
-    fn decompress(&self, bytes: &[u8]) -> value_log::Result<Vec<u8>> {
-        Ok(bytes.into())
-    }
-}
-
-#[derive(Clone)]
-struct NoCacher;
-
-impl BlobCache for NoCacher {
-    fn get(&self, _: ValueLogId, _: &ValueHandle) -> Option<UserValue> {
-        None
-    }
-
-    fn insert(&self, _: ValueLogId, _: &ValueHandle, _: UserValue) {}
-}
+use value_log::{Config, IndexWriter, ValueLog};
 
 #[test]
 fn recovery_fail() -> value_log::Result<()> {

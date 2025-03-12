@@ -1,11 +1,8 @@
 mod common;
 
-use common::{MockIndex, MockIndexWriter};
+use common::{MockIndex, MockIndexWriter, NoCacher};
 use test_log::test;
-use value_log::{
-    BlobCache, Compressor, Config, IndexReader, IndexWriter, UserValue, ValueHandle, ValueLog,
-    ValueLogId,
-};
+use value_log::{Compressor, Config, IndexReader, IndexWriter, ValueLog};
 
 #[derive(Clone, Debug, Default)]
 struct Lz4Compressor;
@@ -17,17 +14,6 @@ impl Compressor for Lz4Compressor {
     fn decompress(&self, bytes: &[u8]) -> value_log::Result<Vec<u8>> {
         lz4_flex::decompress_size_prepended(bytes).map_err(|_| value_log::Error::Decompress)
     }
-}
-
-#[derive(Clone)]
-struct NoCacher;
-
-impl BlobCache for NoCacher {
-    fn get(&self, _: ValueLogId, _: &ValueHandle) -> Option<UserValue> {
-        None
-    }
-
-    fn insert(&self, _: ValueLogId, _: &ValueHandle, _: UserValue) {}
 }
 
 #[test]
