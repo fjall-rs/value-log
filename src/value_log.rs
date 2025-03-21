@@ -18,7 +18,7 @@ use crate::{
 use std::{
     fs::File,
     io::{BufReader, Seek},
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{atomic::AtomicU64, Arc, Mutex},
 };
 
@@ -30,6 +30,16 @@ pub type ValueLogId = u64;
 pub fn get_next_vlog_id() -> ValueLogId {
     static VLOG_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
     VLOG_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+}
+
+fn unlink_blob_files(base_path: &Path, ids: &[SegmentId]) {
+    for id in ids {
+        let path = base_path.join(SEGMENTS_FOLDER).join(id.to_string());
+
+        if let Err(e) = std::fs::remove_file(&path) {
+            log::error!("Could not free blob file at {path:?}: {e:?}");
+        }
+    }
 }
 
 /// A disk-resident value log
@@ -506,32 +516,18 @@ impl<C: Compressor + Clone> ValueLog<C> {
         drop(guard);
 
         if prune_async {
-            log::trace!("Pruning dropped blob files in thread: {ids:?}");
-
             let path = self.path.clone();
 
             std::thread::spawn(move || {
-                for id in ids {
-                    let path = path.join(SEGMENTS_FOLDER).join(id.to_string());
-
-                    if let Err(e) = std::fs::remove_file(&path) {
-                        log::error!("Could not free blob file at {path:?}: {e:?}");
-                    }
-                }
+                log::trace!("Pruning dropped blob files in thread: {ids:?}");
+                unlink_blob_files(&path, &ids);
+                log::trace!("Successfully pruned all blob files");
             });
         } else {
             log::trace!("Pruning dropped blob files: {ids:?}");
-
-            for id in ids {
-                let path = self.path.join(SEGMENTS_FOLDER).join(id.to_string());
-
-                if let Err(e) = std::fs::remove_file(&path) {
-                    log::error!("Could not free blob file at {path:?}: {e:?}");
-                }
-            }
+            unlink_blob_files(&self.path, &ids);
+            log::trace!("Successfully pruned all blob files");
         }
-
-        log::trace!("Successfully pruned all blob files");
 
         Ok(())
     }
