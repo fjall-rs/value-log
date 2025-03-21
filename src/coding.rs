@@ -43,6 +43,8 @@ pub enum DecodeError {
     /// I/O error
     Io(std::io::Error),
 
+    InvalidVersion,
+
     /// Invalid enum tag
     InvalidTag((&'static str, u8)),
 
@@ -87,10 +89,10 @@ pub trait Encode {
 
     /// Serializes into vector.
     #[allow(unused)]
-    fn encode_into_vec(&self) -> Result<Vec<u8>, EncodeError> {
+    fn encode_into_vec(&self) -> Vec<u8> {
         let mut v = vec![];
-        self.encode_into(&mut v)?;
-        Ok(v)
+        self.encode_into(&mut v).expect("cannot fail");
+        v
     }
 }
 

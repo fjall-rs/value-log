@@ -103,7 +103,10 @@
 #![cfg_attr(not(feature = "bytes"), forbid(unsafe_code))]
 
 mod blob_cache;
-mod coding;
+
+#[doc(hidden)]
+pub mod coding;
+
 mod compression;
 mod config;
 mod error;
