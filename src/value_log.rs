@@ -18,7 +18,7 @@ use crate::{
 use std::{
     fs::File,
     io::{BufReader, Seek},
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{atomic::AtomicU64, Arc, Mutex},
 };
 
@@ -30,6 +30,16 @@ pub type ValueLogId = u64;
 pub fn get_next_vlog_id() -> ValueLogId {
     static VLOG_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
     VLOG_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+}
+
+fn unlink_blob_files(base_path: &Path, ids: &[SegmentId]) {
+    for id in ids {
+        let path = base_path.join(SEGMENTS_FOLDER).join(id.to_string());
+
+        if let Err(e) = std::fs::remove_file(&path) {
+            log::error!("Could not free blob file at {path:?}: {e:?}");
+        }
+    }
 }
 
 /// A disk-resident value log
@@ -494,6 +504,32 @@ impl<C: Compressor + Clone> ValueLog<C> {
     ) -> crate::Result<u64> {
         let segment_ids = strategy.pick(self);
         self.rollover(&segment_ids, index_reader, index_writer)
+    }
+
+    /// Atomically removes all data from the value log.
+    ///
+    /// If `prune_async` is set to `true`, the blob files will be removed from disk in a thread to avoid blocking.
+    pub fn clear(&self, prune_async: bool) -> crate::Result<()> {
+        let guard = self.rollover_guard.lock().expect("lock is poisoned");
+        let ids = self.manifest.list_segment_ids();
+        self.manifest.clear()?;
+        drop(guard);
+
+        if prune_async {
+            let path = self.path.clone();
+
+            std::thread::spawn(move || {
+                log::trace!("Pruning dropped blob files in thread: {ids:?}");
+                unlink_blob_files(&path, &ids);
+                log::trace!("Successfully pruned all blob files");
+            });
+        } else {
+            log::trace!("Pruning dropped blob files: {ids:?}");
+            unlink_blob_files(&self.path, &ids);
+            log::trace!("Successfully pruned all blob files");
+        }
+
+        Ok(())
     }
 
     /// Rewrites some segments into new segment(s), blocking the caller
