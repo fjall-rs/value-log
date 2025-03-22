@@ -3,9 +3,7 @@
 // (found in the LICENSE-* files in the repository)
 
 use super::{meta::Metadata, trailer::SegmentFileTrailer};
-use crate::{
-    coding::Encode, compression::Compressor, id::SegmentId, key_range::KeyRange, value::UserKey,
-};
+use crate::{coding::Encode, compression::Compressor, id::SegmentId, key_range::KeyRange, UserKey};
 use byteorder::{BigEndian, WriteBytesExt};
 use std::{
     fs::File,

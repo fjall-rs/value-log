@@ -2,7 +2,7 @@
 // This source code is licensed under both the Apache 2.0 and MIT License
 // (found in the LICENSE-* files in the repository)
 
-use crate::{id::SegmentId, value::UserKey, Compressor, SegmentReader, UserValue};
+use crate::{id::SegmentId, Compressor, SegmentReader, UserKey, UserValue};
 use interval_heap::IntervalHeap;
 use std::cmp::Reverse;
 
