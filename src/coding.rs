@@ -43,6 +43,8 @@ pub enum DecodeError {
     /// I/O error
     Io(std::io::Error),
 
+    Utf8(std::str::Utf8Error),
+
     InvalidVersion,
 
     /// Invalid enum tag
