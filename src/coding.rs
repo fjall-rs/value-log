@@ -69,6 +69,12 @@ impl std::fmt::Display for DecodeError {
     }
 }
 
+impl From<std::str::Utf8Error> for DecodeError {
+    fn from(value: std::str::Utf8Error) -> Self {
+        Self::Utf8(value)
+    }
+}
+
 impl From<std::io::Error> for DecodeError {
     fn from(value: std::io::Error) -> Self {
         Self::Io(value)
