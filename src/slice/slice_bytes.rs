@@ -23,10 +23,44 @@ impl Slice {
         Self(Bytes::from_static(&[]))
     }
 
+    fn get_unzeroed_builder(len: usize) -> BytesMut {
+        // Use `with_capacity` & `set_len`` to avoid zeroing the buffer
+        let mut builder = BytesMut::with_capacity(len);
+
+        // SAFETY: we just allocated `len` bytes, and `read_exact` will fail if
+        // it doesn't fill the buffer, subsequently dropping the uninitialized
+        // BytesMut object
+        #[allow(unsafe_code)]
+        unsafe {
+            builder.set_len(len);
+        }
+
+        builder
+    }
+
     #[doc(hidden)]
     #[must_use]
     pub fn slice(&self, range: impl std::ops::RangeBounds<usize>) -> Self {
         Self(self.0.slice(range))
+    }
+
+    #[doc(hidden)]
+    #[must_use]
+    pub fn fused(slices: &[&[u8]]) -> Self {
+        use std::io::Write;
+
+        let len: usize = slices.iter().map(|x| x.len()).sum();
+
+        let mut builder = Self::get_unzeroed_builder(len);
+        {
+            let mut writer = &mut builder[..];
+
+            for slice in slices {
+                writer.write_all(slice).expect("should write");
+            }
+        }
+
+        Self(builder.freeze())
     }
 
     #[must_use]
@@ -41,16 +75,7 @@ impl Slice {
     /// The reader may not read the existing buffer.
     #[doc(hidden)]
     pub fn from_reader<R: std::io::Read>(reader: &mut R, len: usize) -> std::io::Result<Self> {
-        // Use `with_capacity` & `set_len`` to avoid zeroing the buffer
-        let mut builder = BytesMut::with_capacity(len);
-
-        // SAFETY: we just allocated `len` bytes, and `read_exact` will fail if
-        // it doesn't fill the buffer, subsequently dropping the uninitialized
-        // BytesMut object
-        #[allow(unsafe_code)]
-        unsafe {
-            builder.set_len(len);
-        }
+        let mut builder = Self::get_unzeroed_builder(len);
 
         // SAFETY: Normally, read_exact over an uninitialized buffer is UB,
         // however we know that in lsm-tree etc. only I/O readers or cursors over Vecs are used
