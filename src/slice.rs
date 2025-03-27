@@ -214,26 +214,20 @@ mod tests {
 
     #[test]
     fn slice_fuse_empty() {
-        let bytes = Slice::fused(&[]);
+        let bytes = Slice::fused(&[], &[]);
         assert_eq!(&*bytes, []);
     }
 
     #[test]
     fn slice_fuse_one() {
-        let bytes = Slice::fused(&[b"abc"]);
+        let bytes = Slice::fused(b"abc", &[]);
         assert_eq!(&*bytes, b"abc");
     }
 
     #[test]
     fn slice_fuse_two() {
-        let bytes = Slice::fused(&[b"abc", b"def"]);
+        let bytes = Slice::fused(b"abc", b"def");
         assert_eq!(&*bytes, b"abcdef");
-    }
-
-    #[test]
-    fn slice_fuse_four() {
-        let bytes = Slice::fused(&[b"abc", b"def", b"xyz", b"123"]);
-        assert_eq!(&*bytes, b"abcdefxyz123");
     }
 
     #[test]

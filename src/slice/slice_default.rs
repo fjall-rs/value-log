@@ -31,8 +31,8 @@ impl Slice {
 
     #[doc(hidden)]
     #[must_use]
-    pub fn fused(slices: &[&[u8]]) -> Self {
-        Self(ByteView::fused(slices))
+    pub fn fused(left: &[u8], right: &[u8]) -> Self {
+        Self(ByteView::fused(left, right))
     }
 
     // TODO: change to unzeroed and provide a _zeroed method instead
