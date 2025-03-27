@@ -46,18 +46,16 @@ impl Slice {
 
     #[doc(hidden)]
     #[must_use]
-    pub fn fused(slices: &[&[u8]]) -> Self {
+    pub fn fused(left: &[u8], right: &[u8]) -> Self {
         use std::io::Write;
 
-        let len: usize = slices.iter().map(|x| x.len()).sum();
-
+        let len = left.len() + right.len();
         let mut builder = Self::get_unzeroed_builder(len);
         {
             let mut writer = &mut builder[..];
 
-            for slice in slices {
-                writer.write_all(slice).expect("should write");
-            }
+            writer.write_all(left).expect("should write");
+            writer.write_all(right).expect("should write");
         }
 
         Self(builder.freeze())
