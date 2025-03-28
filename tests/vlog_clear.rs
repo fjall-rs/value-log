@@ -1,5 +1,8 @@
+mod common;
+
+use common::{MockIndex, MockIndexWriter, NoCacher};
 use test_log::test;
-use value_log::{Compressor, Config, IndexWriter, MockIndex, MockIndexWriter, ValueLog};
+use value_log::{Compressor, Config, IndexWriter, ValueLog};
 
 #[derive(Clone, Default)]
 struct NoCompressor;
@@ -24,7 +27,7 @@ fn vlog_clear() -> value_log::Result<()> {
     let items = ["a", "b", "c", "d", "e"];
 
     {
-        let value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default())?;
+        let value_log = ValueLog::open(vl_path, Config::<NoCacher, NoCompressor>::new(NoCacher))?;
 
         for _ in 0..5 {
             let mut index_writer = MockIndexWriter(index.clone());
@@ -55,7 +58,7 @@ fn vlog_clear() -> value_log::Result<()> {
     }
 
     {
-        let value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default())?;
+        let value_log = ValueLog::open(vl_path, Config::<NoCacher, NoCompressor>::new(NoCacher))?;
 
         value_log.scan_for_stats(index.read().unwrap().values().cloned().map(Ok))?;
 
