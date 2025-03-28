@@ -4,21 +4,11 @@
 // When a blob file is registered is after a `scan_for_stats`, it has an reference
 // count of 0. Then it would be dropped even though it was just created.
 
+mod common;
+
+use common::{MockIndex, MockIndexWriter, NoCacher, NoCompressor};
 use test_log::test;
-use value_log::{Compressor, Config, IndexWriter, MockIndex, MockIndexWriter, ValueLog};
-
-#[derive(Clone, Default)]
-struct NoCompressor;
-
-impl Compressor for NoCompressor {
-    fn compress(&self, bytes: &[u8]) -> value_log::Result<Vec<u8>> {
-        Ok(bytes.into())
-    }
-
-    fn decompress(&self, bytes: &[u8]) -> value_log::Result<Vec<u8>> {
-        Ok(bytes.into())
-    }
-}
+use value_log::{Config, IndexWriter, ValueLog};
 
 #[test]
 fn accidental_drop_rc() -> value_log::Result<()> {
@@ -27,7 +17,7 @@ fn accidental_drop_rc() -> value_log::Result<()> {
 
     let index = MockIndex::default();
 
-    let value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default())?;
+    let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher))?;
 
     for key in ["a", "b"] {
         let value = &key;
