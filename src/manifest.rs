@@ -210,6 +210,22 @@ impl<C: Compressor + Clone> SegmentManifest<C> {
         Ok(())
     }
 
+    /// Drops all segments.
+    ///
+    /// This does not delete the files from disk, but just un-refs them from the manifest.
+    ///
+    /// Once this function completes, the disk files can be safely removed.
+    pub fn clear(&self) -> crate::Result<()> {
+        self.atomic_swap(|recipe| {
+            recipe.clear();
+        })
+    }
+
+    /// Drops the given segments.
+    ///
+    /// This does not delete the files from disk, but just un-refs them from the manifest.
+    ///
+    /// Once this function completes, the disk files can be safely removed.
     pub fn drop_segments(&self, ids: &[u64]) -> crate::Result<()> {
         self.atomic_swap(|recipe| {
             recipe.retain(|x, _| !ids.contains(x));

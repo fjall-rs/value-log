@@ -29,6 +29,12 @@ impl Slice {
         Self(self.0.slice(range))
     }
 
+    #[doc(hidden)]
+    #[must_use]
+    pub fn fused(left: &[u8], right: &[u8]) -> Self {
+        Self(ByteView::fused(left, right))
+    }
+
     // TODO: change to unzeroed and provide a _zeroed method instead
     #[must_use]
     #[doc(hidden)]
