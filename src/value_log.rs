@@ -3,7 +3,6 @@
 // (found in the LICENSE-* files in the repository)
 
 use crate::{
-    blob_cache::BlobCache,
     gc::report::GcReport,
     id::{IdGenerator, SegmentId},
     index::Writer as IndexWriter,
@@ -11,9 +10,9 @@ use crate::{
     path::absolute_path,
     scanner::{Scanner, SizeMap},
     segment::merge::MergeReader,
-    value::UserValue,
     version::Version,
-    Compressor, Config, GcStrategy, IndexReader, SegmentReader, SegmentWriter, ValueHandle,
+    BlobCache, Compressor, Config, GcStrategy, IndexReader, SegmentReader, SegmentWriter,
+    UserValue, ValueHandle,
 };
 use std::{
     fs::File,
@@ -44,10 +43,10 @@ fn unlink_blob_files(base_path: &Path, ids: &[SegmentId]) {
 
 /// A disk-resident value log
 #[derive(Clone)]
-pub struct ValueLog<C: Compressor + Clone>(Arc<ValueLogInner<C>>);
+pub struct ValueLog<BC: BlobCache, C: Compressor + Clone>(Arc<ValueLogInner<BC, C>>);
 
-impl<C: Compressor + Clone> std::ops::Deref for ValueLog<C> {
-    type Target = ValueLogInner<C>;
+impl<BC: BlobCache, C: Compressor + Clone> std::ops::Deref for ValueLog<BC, C> {
+    type Target = ValueLogInner<BC, C>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -55,7 +54,7 @@ impl<C: Compressor + Clone> std::ops::Deref for ValueLog<C> {
 }
 
 #[allow(clippy::module_name_repetitions)]
-pub struct ValueLogInner<C: Compressor + Clone> {
+pub struct ValueLogInner<BC: BlobCache, C: Compressor + Clone> {
     /// Unique value log ID
     id: u64,
 
@@ -63,10 +62,10 @@ pub struct ValueLogInner<C: Compressor + Clone> {
     pub path: PathBuf,
 
     /// Value log configuration
-    config: Config<C>,
+    config: Config<BC, C>,
 
     /// In-memory blob cache
-    blob_cache: Arc<BlobCache>,
+    blob_cache: BC,
 
     /// Segment manifest
     #[doc(hidden)]
@@ -81,7 +80,7 @@ pub struct ValueLogInner<C: Compressor + Clone> {
     pub rollover_guard: Mutex<()>,
 }
 
-impl<C: Compressor + Clone> ValueLog<C> {
+impl<BC: BlobCache, C: Compressor + Clone> ValueLog<BC, C> {
     /// Creates or recovers a value log in the given directory.
     ///
     /// # Errors
@@ -89,7 +88,7 @@ impl<C: Compressor + Clone> ValueLog<C> {
     /// Will return `Err` if an IO error occurs.
     pub fn open<P: Into<PathBuf>>(
         path: P, // TODO: move path into config?
-        config: Config<C>,
+        config: Config<BC, C>,
     ) -> crate::Result<Self> {
         let path = path.into();
 
@@ -142,7 +141,10 @@ impl<C: Compressor + Clone> ValueLog<C> {
     }
 
     /// Creates a new empty value log in a directory.
-    pub(crate) fn create_new<P: Into<PathBuf>>(path: P, config: Config<C>) -> crate::Result<Self> {
+    pub(crate) fn create_new<P: Into<PathBuf>>(
+        path: P,
+        config: Config<BC, C>,
+    ) -> crate::Result<Self> {
         let path = absolute_path(path.into());
         log::trace!("Creating value-log at {}", path.display());
 
@@ -185,7 +187,7 @@ impl<C: Compressor + Clone> ValueLog<C> {
         })))
     }
 
-    pub(crate) fn recover<P: Into<PathBuf>>(path: P, config: Config<C>) -> crate::Result<Self> {
+    pub(crate) fn recover<P: Into<PathBuf>>(path: P, config: Config<BC, C>) -> crate::Result<Self> {
         let path = path.into();
         log::info!("Recovering vLog at {}", path.display());
 
@@ -278,8 +280,7 @@ impl<C: Compressor + Clone> ValueLog<C> {
         };
         let (_key, val, _checksum) = item?;
 
-        self.blob_cache
-            .insert((self.id, vhandle.clone()).into(), val.clone());
+        self.blob_cache.insert(self.id, vhandle, val.clone());
 
         // TODO: maybe we can look at the value size and prefetch some more values
         // without causing another I/O...
@@ -298,7 +299,7 @@ impl<C: Compressor + Clone> ValueLog<C> {
                 offset,
             };
 
-            self.blob_cache.insert((self.id, value_handle).into(), val);
+            self.blob_cache.insert(self.id, &value_handle, val);
         }
 
         Ok(Some(val))
@@ -498,7 +499,7 @@ impl<C: Compressor + Clone> ValueLog<C> {
     /// Will return `Err` if an IO error occurs.
     pub fn apply_gc_strategy<R: IndexReader, W: IndexWriter>(
         &self,
-        strategy: &impl GcStrategy<C>,
+        strategy: &impl GcStrategy<BC, C>,
         index_reader: &R,
         index_writer: W,
     ) -> crate::Result<u64> {

@@ -1,20 +1,8 @@
+mod common;
+
+use common::{MockIndex, MockIndexWriter, NoCacher, NoCompressor};
 use test_log::test;
-use value_log::{
-    Compressor, Config, IndexWriter, KeyRange, MockIndex, MockIndexWriter, Slice, ValueLog,
-};
-
-#[derive(Clone, Default)]
-struct NoCompressor;
-
-impl Compressor for NoCompressor {
-    fn compress(&self, bytes: &[u8]) -> value_log::Result<Vec<u8>> {
-        Ok(bytes.into())
-    }
-
-    fn decompress(&self, bytes: &[u8]) -> value_log::Result<Vec<u8>> {
-        Ok(bytes.into())
-    }
-}
+use value_log::{Config, IndexWriter, KeyRange, Slice, ValueLog};
 
 #[test]
 fn basic_kv() -> value_log::Result<()> {
@@ -26,7 +14,7 @@ fn basic_kv() -> value_log::Result<()> {
     let items = ["a", "b", "c", "d", "e"];
 
     {
-        let value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default())?;
+        let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher))?;
 
         {
             let mut index_writer = MockIndexWriter(index.clone());
@@ -49,7 +37,7 @@ fn basic_kv() -> value_log::Result<()> {
     }
 
     {
-        let value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default())?;
+        let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher))?;
 
         assert_eq!(1, value_log.segment_count());
 

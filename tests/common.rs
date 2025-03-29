@@ -2,10 +2,12 @@
 // This source code is licensed under both the Apache 2.0 and MIT License
 // (found in the LICENSE-* files in the repository)
 
-use crate::{value::UserKey, IndexReader, IndexWriter, ValueHandle};
 use std::{
     collections::BTreeMap,
     sync::{Arc, RwLock},
+};
+use value_log::{
+    BlobCache, Compressor, IndexReader, IndexWriter, UserKey, UserValue, ValueHandle, ValueLogId,
 };
 
 type MockIndexInner = RwLock<BTreeMap<UserKey, (ValueHandle, u32)>>;
@@ -25,6 +27,7 @@ impl std::ops::Deref for MockIndex {
 
 impl MockIndex {
     /// Remove item
+    #[allow(unused)]
     pub fn remove(&self, key: &[u8]) {
         self.0.write().expect("lock is poisoned").remove(key);
     }
@@ -62,4 +65,28 @@ impl IndexWriter for MockIndexWriter {
     fn finish(&mut self) -> std::io::Result<()> {
         Ok(())
     }
+}
+
+#[derive(Clone, Default)]
+pub struct NoCompressor;
+
+impl Compressor for NoCompressor {
+    fn compress(&self, bytes: &[u8]) -> value_log::Result<Vec<u8>> {
+        Ok(bytes.into())
+    }
+
+    fn decompress(&self, bytes: &[u8]) -> value_log::Result<Vec<u8>> {
+        Ok(bytes.into())
+    }
+}
+
+#[derive(Clone)]
+pub struct NoCacher;
+
+impl BlobCache for NoCacher {
+    fn get(&self, _: ValueLogId, _: &ValueHandle) -> Option<UserValue> {
+        None
+    }
+
+    fn insert(&self, _: ValueLogId, _: &ValueHandle, _: UserValue) {}
 }

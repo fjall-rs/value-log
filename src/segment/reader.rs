@@ -3,7 +3,7 @@
 // (found in the LICENSE-* files in the repository)
 
 use super::{meta::METADATA_HEADER_MAGIC, writer::BLOB_HEADER_MAGIC};
-use crate::{coding::DecodeError, id::SegmentId, value::UserKey, Compressor, Slice, UserValue};
+use crate::{coding::DecodeError, id::SegmentId, Compressor, Slice, UserKey, UserValue};
 use byteorder::{BigEndian, ReadBytesExt};
 use std::{
     fs::File,

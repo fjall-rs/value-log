@@ -1,18 +1,8 @@
+mod common;
+
+use common::{MockIndex, MockIndexWriter, NoCacher, NoCompressor};
 use test_log::test;
-use value_log::{Compressor, Config, IndexWriter, MockIndex, MockIndexWriter, ValueLog};
-
-#[derive(Clone, Default)]
-struct NoCompressor;
-
-impl Compressor for NoCompressor {
-    fn compress(&self, bytes: &[u8]) -> value_log::Result<Vec<u8>> {
-        Ok(bytes.into())
-    }
-
-    fn decompress(&self, bytes: &[u8]) -> value_log::Result<Vec<u8>> {
-        Ok(bytes.into())
-    }
-}
+use value_log::{Config, IndexWriter, ValueLog};
 
 #[test]
 fn basic_gc() -> value_log::Result<()> {
@@ -21,7 +11,7 @@ fn basic_gc() -> value_log::Result<()> {
 
     let index = MockIndex::default();
 
-    let value_log = ValueLog::open(vl_path, Config::<NoCompressor>::default())?;
+    let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher))?;
 
     {
         let items = ["a", "b", "c", "d", "e"];

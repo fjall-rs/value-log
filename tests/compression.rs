@@ -1,7 +1,8 @@
+mod common;
+
+use common::{MockIndex, MockIndexWriter, NoCacher};
 use test_log::test;
-use value_log::{
-    Compressor, Config, IndexReader, IndexWriter, MockIndex, MockIndexWriter, ValueLog,
-};
+use value_log::{Compressor, Config, IndexReader, IndexWriter, ValueLog};
 
 #[derive(Clone, Debug, Default)]
 struct Lz4Compressor;
@@ -22,7 +23,7 @@ fn compression() -> value_log::Result<()> {
 
     let index = MockIndex::default();
 
-    let value_log = ValueLog::open(vl_path, Config::<Lz4Compressor>::default())?;
+    let value_log = ValueLog::open(vl_path, Config::<_, Lz4Compressor>::new(NoCacher))?;
 
     let mut index_writer = MockIndexWriter(index.clone());
     let mut writer = value_log.get_writer()?;
