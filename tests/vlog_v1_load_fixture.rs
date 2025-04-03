@@ -8,7 +8,7 @@ use value_log::{Config, ValueLog};
 fn vlog_load_v1() -> value_log::Result<()> {
     let path = std::path::Path::new("test_fixture/v1_vlog");
 
-    let value_log = ValueLog::open(path, Config::<_, NoCompressor>::new(NoCacher))?;
+    let value_log = ValueLog::open(path, Config::<_, _, NoCompressor>::new(NoCacher, NoCacher))?;
 
     let count = {
         let mut count = 0;
@@ -32,7 +32,7 @@ fn vlog_load_v1() -> value_log::Result<()> {
 fn vlog_load_v1_corrupt() -> value_log::Result<()> {
     let path = std::path::Path::new("test_fixture/v1_vlog_corrupt");
 
-    let value_log = ValueLog::open(path, Config::<_, NoCompressor>::new(NoCacher))?;
+    let value_log = ValueLog::open(path, Config::<_, _, NoCompressor>::new(NoCacher, NoCacher))?;
 
     assert_eq!(2, value_log.verify()?);
 

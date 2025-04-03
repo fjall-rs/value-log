@@ -11,7 +11,7 @@ use crate::{
     scanner::{Scanner, SizeMap},
     segment::merge::MergeReader,
     version::Version,
-    BlobCache, Compressor, Config, GcStrategy, IndexReader, SegmentReader, SegmentWriter,
+    BlobCache, Compressor, Config, FDCache, GcStrategy, IndexReader, SegmentReader, SegmentWriter,
     UserValue, ValueHandle,
 };
 use std::{
@@ -43,10 +43,12 @@ fn unlink_blob_files(base_path: &Path, ids: &[SegmentId]) {
 
 /// A disk-resident value log
 #[derive(Clone)]
-pub struct ValueLog<BC: BlobCache, C: Compressor + Clone>(Arc<ValueLogInner<BC, C>>);
+pub struct ValueLog<BC: BlobCache, FDC: FDCache, C: Compressor + Clone>(
+    Arc<ValueLogInner<BC, FDC, C>>,
+);
 
-impl<BC: BlobCache, C: Compressor + Clone> std::ops::Deref for ValueLog<BC, C> {
-    type Target = ValueLogInner<BC, C>;
+impl<BC: BlobCache, C: Compressor + Clone, FDC: FDCache> std::ops::Deref for ValueLog<BC, FDC, C> {
+    type Target = ValueLogInner<BC, FDC, C>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -54,7 +56,7 @@ impl<BC: BlobCache, C: Compressor + Clone> std::ops::Deref for ValueLog<BC, C> {
 }
 
 #[allow(clippy::module_name_repetitions)]
-pub struct ValueLogInner<BC: BlobCache, C: Compressor + Clone> {
+pub struct ValueLogInner<BC: BlobCache, FDC: FDCache, C: Compressor + Clone> {
     /// Unique value log ID
     id: u64,
 
@@ -62,10 +64,13 @@ pub struct ValueLogInner<BC: BlobCache, C: Compressor + Clone> {
     pub path: PathBuf,
 
     /// Value log configuration
-    config: Config<BC, C>,
+    config: Config<BC, FDC, C>,
 
     /// In-memory blob cache
     blob_cache: BC,
+
+    /// In-memory FD cache
+    fd_cache: FDC,
 
     /// Segment manifest
     #[doc(hidden)]
@@ -80,7 +85,7 @@ pub struct ValueLogInner<BC: BlobCache, C: Compressor + Clone> {
     pub rollover_guard: Mutex<()>,
 }
 
-impl<BC: BlobCache, C: Compressor + Clone> ValueLog<BC, C> {
+impl<BC: BlobCache, C: Compressor + Clone, FDC: FDCache> ValueLog<BC, FDC, C> {
     /// Creates or recovers a value log in the given directory.
     ///
     /// # Errors
@@ -88,7 +93,7 @@ impl<BC: BlobCache, C: Compressor + Clone> ValueLog<BC, C> {
     /// Will return `Err` if an IO error occurs.
     pub fn open<P: Into<PathBuf>>(
         path: P, // TODO: move path into config?
-        config: Config<BC, C>,
+        config: Config<BC, FDC, C>,
     ) -> crate::Result<Self> {
         let path = path.into();
 
@@ -143,7 +148,7 @@ impl<BC: BlobCache, C: Compressor + Clone> ValueLog<BC, C> {
     /// Creates a new empty value log in a directory.
     pub(crate) fn create_new<P: Into<PathBuf>>(
         path: P,
-        config: Config<BC, C>,
+        config: Config<BC, FDC, C>,
     ) -> crate::Result<Self> {
         let path = absolute_path(path.into());
         log::trace!("Creating value-log at {}", path.display());
@@ -174,6 +179,7 @@ impl<BC: BlobCache, C: Compressor + Clone> ValueLog<BC, C> {
         }
 
         let blob_cache = config.blob_cache.clone();
+        let fd_cache = config.fd_cache.clone();
         let manifest = SegmentManifest::create_new(&path)?;
 
         Ok(Self(Arc::new(ValueLogInner {
@@ -181,13 +187,17 @@ impl<BC: BlobCache, C: Compressor + Clone> ValueLog<BC, C> {
             config,
             path,
             blob_cache,
+            fd_cache,
             manifest,
             id_generator: IdGenerator::default(),
             rollover_guard: Mutex::new(()),
         })))
     }
 
-    pub(crate) fn recover<P: Into<PathBuf>>(path: P, config: Config<BC, C>) -> crate::Result<Self> {
+    pub(crate) fn recover<P: Into<PathBuf>>(
+        path: P,
+        config: Config<BC, FDC, C>,
+    ) -> crate::Result<Self> {
         let path = path.into();
         log::info!("Recovering vLog at {}", path.display());
 
@@ -204,6 +214,7 @@ impl<BC: BlobCache, C: Compressor + Clone> ValueLog<BC, C> {
         }
 
         let blob_cache = config.blob_cache.clone();
+        let fd_cache = config.fd_cache.clone();
         let manifest = SegmentManifest::recover(&path)?;
 
         let highest_id = manifest
@@ -220,6 +231,7 @@ impl<BC: BlobCache, C: Compressor + Clone> ValueLog<BC, C> {
             config,
             path,
             blob_cache,
+            fd_cache,
             manifest,
             id_generator: IdGenerator::new(highest_id + 1),
             rollover_guard: Mutex::new(()),
@@ -270,6 +282,7 @@ impl<BC: BlobCache, C: Compressor + Clone> ValueLog<BC, C> {
             return Ok(None);
         };
 
+        // TODO: this is the part with the repeated fopen() to the same file
         let mut reader = BufReader::new(File::open(&segment.path)?);
         reader.seek(std::io::SeekFrom::Start(vhandle.offset))?;
         let mut reader = SegmentReader::with_reader(vhandle.segment_id, reader)
@@ -499,7 +512,7 @@ impl<BC: BlobCache, C: Compressor + Clone> ValueLog<BC, C> {
     /// Will return `Err` if an IO error occurs.
     pub fn apply_gc_strategy<R: IndexReader, W: IndexWriter>(
         &self,
-        strategy: &impl GcStrategy<BC, C>,
+        strategy: &impl GcStrategy<BC, FDC, C>,
         index_reader: &R,
         index_writer: W,
     ) -> crate::Result<u64> {

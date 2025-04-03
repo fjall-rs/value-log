@@ -14,7 +14,10 @@ fn recovery_fail() -> value_log::Result<()> {
     let items = ["a", "b", "c", "d", "e"];
 
     {
-        let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher))?;
+        let value_log = ValueLog::open(
+            vl_path,
+            Config::<_, _, NoCompressor>::new(NoCacher, NoCacher),
+        )?;
 
         for _ in 0..2 {
             let mut index_writer = MockIndexWriter(index.clone());
@@ -45,7 +48,10 @@ fn recovery_fail() -> value_log::Result<()> {
 
     {
         matches!(
-            ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher)),
+            ValueLog::open(
+                vl_path,
+                Config::<_, _, NoCompressor>::new(NoCacher, NoCacher)
+            ),
             Err(value_log::Error::Unrecoverable),
         );
     }

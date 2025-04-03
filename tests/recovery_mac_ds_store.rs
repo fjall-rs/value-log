@@ -10,7 +10,10 @@ fn recovery_mac_ds_store() -> value_log::Result<()> {
     let vl_path = folder.path();
 
     {
-        let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher))?;
+        let value_log = ValueLog::open(
+            vl_path,
+            Config::<_, _, NoCompressor>::new(NoCacher, NoCacher),
+        )?;
 
         let mut writer = value_log.get_writer()?;
         writer.write("a", "a")?;
@@ -22,7 +25,10 @@ fn recovery_mac_ds_store() -> value_log::Result<()> {
     assert!(ds_store.try_exists()?);
 
     {
-        let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher))?;
+        let value_log = ValueLog::open(
+            vl_path,
+            Config::<_, _, NoCompressor>::new(NoCacher, NoCacher),
+        )?;
         assert_eq!(1, value_log.segment_count());
     }
     assert!(ds_store.try_exists()?);

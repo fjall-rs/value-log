@@ -2,25 +2,29 @@
 // This source code is licensed under both the Apache 2.0 and MIT License
 // (found in the LICENSE-* files in the repository)
 
-use crate::{blob_cache::BlobCache, compression::Compressor};
+use crate::{blob_cache::BlobCache, compression::Compressor, fd_cache::BlobFileId, FDCache};
 
 /// Value log configuration
-pub struct Config<BC: BlobCache, C: Compressor + Clone> {
+pub struct Config<BC: BlobCache, FDC: FDCache, C: Compressor + Clone> {
     /// Target size of vLog segments
     pub(crate) segment_size_bytes: u64,
 
     /// Blob cache to use
     pub(crate) blob_cache: BC,
 
+    /// File descriptor cache to use
+    pub(crate) fd_cache: FDC,
+
     /// Compression to use
     pub(crate) compression: C,
 }
 
-impl<BC: BlobCache, C: Compressor + Clone + Default> Config<BC, C> {
+impl<BC: BlobCache, FDC: FDCache, C: Compressor + Clone + Default> Config<BC, FDC, C> {
     /// Creates a new configuration builder.
-    pub fn new(blob_cache: BC) -> Self {
+    pub fn new(blob_cache: BC, fd_cache: FDC) -> Self {
         Self {
             blob_cache,
+            fd_cache,
             compression: Default::default(),
             segment_size_bytes: 128 * 1_024 * 1_024,
         }

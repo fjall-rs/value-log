@@ -14,7 +14,10 @@ fn basic_kv() -> value_log::Result<()> {
     let items = ["a", "b", "c", "d", "e"];
 
     {
-        let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher))?;
+        let value_log = ValueLog::open(
+            vl_path,
+            Config::<_, _, NoCompressor>::new(NoCacher, NoCacher),
+        )?;
 
         {
             let mut index_writer = MockIndexWriter(index.clone());
@@ -37,7 +40,10 @@ fn basic_kv() -> value_log::Result<()> {
     }
 
     {
-        let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher))?;
+        let value_log = ValueLog::open(
+            vl_path,
+            Config::<_, _, NoCompressor>::new(NoCacher, NoCacher),
+        )?;
 
         assert_eq!(1, value_log.segment_count());
 

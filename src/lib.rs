@@ -51,6 +51,7 @@
 #![cfg_attr(not(feature = "bytes"), forbid(unsafe_code))]
 
 mod blob_cache;
+mod fd_cache;
 
 #[doc(hidden)]
 pub mod coding;
@@ -82,6 +83,7 @@ pub use {
     compression::Compressor,
     config::Config,
     error::{Error, Result},
+    fd_cache::{BlobFileId, FDCache},
     gc::report::GcReport,
     gc::{GcStrategy, SpaceAmpStrategy, StaleThresholdStrategy},
     handle::ValueHandle,

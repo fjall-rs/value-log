@@ -4,10 +4,13 @@
 
 use std::{
     collections::BTreeMap,
+    fs::File,
+    io::BufReader,
     sync::{Arc, RwLock},
 };
 use value_log::{
-    BlobCache, Compressor, IndexReader, IndexWriter, UserKey, UserValue, ValueHandle, ValueLogId,
+    BlobCache, BlobFileId, Compressor, FDCache, IndexReader, IndexWriter, UserKey, UserValue,
+    ValueHandle, ValueLogId,
 };
 
 type MockIndexInner = RwLock<BTreeMap<UserKey, (ValueHandle, u32)>>;
@@ -89,4 +92,11 @@ impl BlobCache for NoCacher {
     }
 
     fn insert(&self, _: ValueLogId, _: &ValueHandle, _: UserValue) {}
+}
+
+impl FDCache for NoCacher {
+    fn get(&self, _: ValueLogId, _: BlobFileId) -> Option<std::io::BufReader<std::fs::File>> {
+        None
+    }
+    fn insert(&self, _: ValueLogId, _: BlobFileId, _: BufReader<File>) {}
 }

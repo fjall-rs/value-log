@@ -2,11 +2,13 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use rand::{Rng, RngCore};
 use std::{
     collections::BTreeMap,
+    fs::File,
+    io::BufReader,
     sync::{Arc, RwLock},
 };
 use value_log::{
-    BlobCache, Compressor, Config, IndexReader, IndexWriter, UserKey, UserValue, ValueHandle,
-    ValueLog, ValueLogId,
+    BlobCache, BlobFileId, Compressor, Config, FDCache, IndexReader, IndexWriter, UserKey,
+    UserValue, ValueHandle, ValueLog, ValueLogId,
 };
 
 type MockIndexInner = RwLock<BTreeMap<UserKey, (ValueHandle, u32)>>;
@@ -89,6 +91,13 @@ impl BlobCache for NoCacher {
     fn insert(&self, _: ValueLogId, _: &ValueHandle, _: UserValue) {}
 }
 
+impl FDCache for NoCacher {
+    fn get(&self, _: ValueLogId, _: BlobFileId) -> Option<std::io::BufReader<std::fs::File>> {
+        None
+    }
+    fn insert(&self, _: ValueLogId, _: BlobFileId, _: BufReader<File>) {}
+}
+
 fn prefetch(c: &mut Criterion) {
     let mut group = c.benchmark_group("prefetch range");
 
@@ -101,7 +110,11 @@ fn prefetch(c: &mut Criterion) {
     let folder = tempfile::tempdir().unwrap();
     let vl_path = folder.path();
 
-    let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher)).unwrap();
+    let value_log = ValueLog::open(
+        vl_path,
+        Config::<_, _, NoCompressor>::new(NoCacher, NoCacher),
+    )
+    .unwrap();
 
     let mut writer = value_log.get_writer().unwrap();
 
@@ -184,7 +197,11 @@ fn load_value(c: &mut Criterion) {
         let folder = tempfile::tempdir().unwrap();
         let vl_path = folder.path();
 
-        let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher)).unwrap();
+        let value_log = ValueLog::open(
+            vl_path,
+            Config::<_, _, NoCompressor>::new(NoCacher, NoCacher),
+        )
+        .unwrap();
 
         let mut writer = value_log.get_writer().unwrap();
 
