@@ -23,7 +23,10 @@ fn compression() -> value_log::Result<()> {
 
     let index = MockIndex::default();
 
-    let value_log = ValueLog::open(vl_path, Config::<_, Lz4Compressor>::new(NoCacher))?;
+    let value_log = ValueLog::open(
+        vl_path,
+        Config::<_, Lz4Compressor>::new(NoCacher).compression(Some(Lz4Compressor)),
+    )?;
 
     let mut index_writer = MockIndexWriter(index.clone());
     let mut writer = value_log.get_writer()?;
