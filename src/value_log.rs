@@ -282,8 +282,17 @@ impl<BC: BlobCache, C: Compressor + Clone, FDC: FDCache> ValueLog<BC, FDC, C> {
             return Ok(None);
         };
 
-        // TODO: this is the part with the repeated fopen() to the same file
-        let mut reader = BufReader::new(File::open(&segment.path)?);
+        let fd = match self.fd_cache.get(self.id, vhandle.segment_id) {
+            Some(fd) => fd,
+            None => {
+                let fd = File::open(&segment.path)?;
+                let fd_clone = fd.try_clone()?;
+                self.fd_cache.insert(self.id, vhandle.segment_id, fd_clone);
+                fd
+            }
+        };
+
+        let mut reader = BufReader::new(fd);
         reader.seek(std::io::SeekFrom::Start(vhandle.offset))?;
         let mut reader = SegmentReader::with_reader(vhandle.segment_id, reader)
             .use_compression(self.config.compression.clone());
@@ -314,6 +323,9 @@ impl<BC: BlobCache, C: Compressor + Clone, FDC: FDCache> ValueLog<BC, FDC, C> {
 
             self.blob_cache.insert(self.id, &value_handle, val);
         }
+
+        // cache the fd for future use, must ensure to always use SeekFrom::Start
+        // self.fd_cache.insert(self.id, vhandle.segment_id, reader.inner);
 
         Ok(Some(val))
     }

@@ -95,8 +95,8 @@ impl BlobCache for NoCacher {
 }
 
 impl FDCache for NoCacher {
-    fn get(&self, _: ValueLogId, _: BlobFileId) -> Option<std::io::BufReader<std::fs::File>> {
+    fn get(&self, _: ValueLogId, _: BlobFileId) -> Option<std::fs::File> {
         None
     }
-    fn insert(&self, _: ValueLogId, _: BlobFileId, _: BufReader<File>) {}
+    fn insert(&self, _: ValueLogId, _: BlobFileId, _: File) {}
 }

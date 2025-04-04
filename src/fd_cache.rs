@@ -8,12 +8,12 @@ use std::{fs::File, io::BufReader};
 /// The unique identifier for a value log blob file. Another name for SegmentId
 pub type BlobFileId = u64;
 
-/// File descriptor cache, to cache file descriptors after an open() syscall.
-/// Reduces the number of open() syscalls needed accessing the same blob file.
+/// File descriptor cache, to cache file descriptors after an fopen().
+/// Reduces the number of fopen() needed when accessing the same blob file.
 pub trait FDCache: Clone {
     /// Caches a file descriptor
-    fn insert(&self, vlog_id: ValueLogId, blob_file_id: BlobFileId, fd: BufReader<File>);
+    fn insert(&self, vlog_id: ValueLogId, blob_file_id: BlobFileId, fd: File);
 
     /// Retrieves a file descriptor from the cache, or `None` if it could not be found
-    fn get(&self, vlog_id: ValueLogId, blob_file_id: BlobFileId) -> Option<BufReader<File>>;
+    fn get(&self, vlog_id: ValueLogId, blob_file_id: BlobFileId) -> Option<File>;
 }
