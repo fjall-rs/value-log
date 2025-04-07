@@ -282,17 +282,11 @@ impl<BC: BlobCache, C: Compressor + Clone, FDC: FDCache> ValueLog<BC, FDC, C> {
             return Ok(None);
         };
 
-        let fd = match self.fd_cache.get(self.id, vhandle.segment_id) {
+        let mut reader = match self.fd_cache.get(self.id, vhandle.segment_id) {
             Some(fd) => fd,
-            None => {
-                let fd = File::open(&segment.path)?;
-                let fd_clone = fd.try_clone()?;
-                self.fd_cache.insert(self.id, vhandle.segment_id, fd_clone);
-                fd
-            }
+            None => BufReader::new(File::open(&segment.path)?),
         };
 
-        let mut reader = BufReader::new(fd);
         reader.seek(std::io::SeekFrom::Start(vhandle.offset))?;
         let mut reader = SegmentReader::with_reader(vhandle.segment_id, reader)
             .use_compression(self.config.compression.clone());
@@ -324,8 +318,9 @@ impl<BC: BlobCache, C: Compressor + Clone, FDC: FDCache> ValueLog<BC, FDC, C> {
             self.blob_cache.insert(self.id, &value_handle, val);
         }
 
-        // cache the fd for future use, must ensure to always use SeekFrom::Start
-        // self.fd_cache.insert(self.id, vhandle.segment_id, reader.inner);
+        // cache the BufReader for future use, must ensure to always use SeekFrom::Start when using it from cache
+        self.fd_cache
+            .insert(self.id, vhandle.segment_id, reader.into_inner());
 
         Ok(Some(val))
     }

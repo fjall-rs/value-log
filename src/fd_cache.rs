@@ -12,8 +12,8 @@ pub type BlobFileId = u64;
 /// Reduces the number of fopen() needed when accessing the same blob file.
 pub trait FDCache: Clone {
     /// Caches a file descriptor
-    fn insert(&self, vlog_id: ValueLogId, blob_file_id: BlobFileId, fd: File);
+    fn insert(&self, vlog_id: ValueLogId, blob_file_id: BlobFileId, fd: BufReader<File>);
 
     /// Retrieves a file descriptor from the cache, or `None` if it could not be found
-    fn get(&self, vlog_id: ValueLogId, blob_file_id: BlobFileId) -> Option<File>;
+    fn get(&self, vlog_id: ValueLogId, blob_file_id: BlobFileId) -> Option<BufReader<File>>;
 }
