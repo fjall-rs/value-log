@@ -1,6 +1,6 @@
 mod common;
 
-use common::{MockIndex, MockIndexWriter, NoCacher, NoCompressor};
+use common::{InMemCacher, MockIndex, MockIndexWriter, NoCacher, NoCompressor};
 use test_log::test;
 use value_log::{Config, IndexWriter, KeyRange, Slice, ValueLog};
 
@@ -69,6 +69,47 @@ fn basic_kv() -> value_log::Result<()> {
             assert_eq!(&*item, &*key.repeat(10_000));
         }
     }
+
+    Ok(())
+}
+
+#[test]
+fn get_with_cached_fd() -> value_log::Result<()> {
+    let folder = tempfile::tempdir()?;
+    let vl_path = folder.path();
+    let items = ["a", "b", "c", "d", "e"];
+    let index = MockIndex::default();
+
+    let fd_cache = InMemCacher::default();
+    let value_log = ValueLog::open(
+        vl_path,
+        Config::<_, _, NoCompressor>::new(NoCacher, fd_cache.clone()),
+    )?;
+
+    let mut index_writer = MockIndexWriter(index.clone());
+    let mut writer = value_log.get_writer()?;
+
+    for key in items {
+        let value = key.repeat(10_000);
+        let value = value.as_bytes();
+
+        let key = key.as_bytes();
+
+        let vhandle = writer.get_next_value_handle();
+        index_writer.insert_indirect(key, vhandle, value.len() as u32)?;
+
+        writer.write(key, value)?;
+    }
+    value_log.register_writer(writer)?;
+
+    for (key, (vhandle, _)) in index.read().unwrap().iter() {
+        let item = value_log.get(vhandle)?.unwrap();
+        assert_eq!(item, key.repeat(10_000));
+    }
+
+    let index_len = index.read().unwrap().len() as u32;
+    // The first item will cache the fd, subsequent accesses will all be cache hits
+    assert_eq!(fd_cache.get_hit_count(), index_len - 1);
 
     Ok(())
 }
