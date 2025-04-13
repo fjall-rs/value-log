@@ -100,6 +100,7 @@ fn get_with_cached_fd() -> value_log::Result<()> {
 
         writer.write(key, value)?;
     }
+
     value_log.register_writer(writer)?;
 
     for (key, (vhandle, _)) in index.read().unwrap().iter() {
@@ -109,6 +110,7 @@ fn get_with_cached_fd() -> value_log::Result<()> {
 
     let index_len = index.read().unwrap().len() as u32;
     // The first item will cache the fd, subsequent accesses will all be cache hits
+    assert_eq!(fd_cache.get_miss_count(), 1);
     assert_eq!(fd_cache.get_hit_count(), index_len - 1);
 
     Ok(())

@@ -7,6 +7,7 @@ use std::{
     collections::{BTreeMap, HashMap},
     fs::File,
     io::BufReader,
+    ops::Add,
     sync::{Arc, Mutex, RwLock},
 };
 use value_log::{
@@ -106,10 +107,15 @@ impl FDCache for NoCacher {
 pub struct InMemCacher {
     fd_cache: Arc<Mutex<HashMap<(ValueLogId, BlobFileId), File>>>,
     fd_hit_count: Arc<RefCell<u32>>,
+    fd_miss_count: Arc<RefCell<u32>>,
 }
 impl InMemCacher {
     pub(crate) fn get_hit_count(&self) -> u32 {
         *self.fd_hit_count.borrow()
+    }
+
+    pub(crate) fn get_miss_count(&self) -> u32 {
+        *self.fd_miss_count.borrow()
     }
 }
 
@@ -118,7 +124,10 @@ impl FDCache for InMemCacher {
         let lock = self.fd_cache.lock().unwrap();
         let fd = match lock.get(&(vlog_id, blob_file_id)) {
             Some(fd) => fd,
-            None => return None,
+            None => {
+                *self.fd_miss_count.borrow_mut() += 1;
+                return None;
+            }
         };
 
         let fd_clone = fd.try_clone().unwrap();
