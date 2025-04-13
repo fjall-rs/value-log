@@ -59,6 +59,10 @@ impl<C: Compressor + Clone> Reader<C> {
         self.compression = Some(compressor);
         self
     }
+
+    pub(crate) fn into_inner(self) -> BufReader<File> {
+        self.inner
+    }
 }
 
 impl<C: Compressor + Clone> Iterator for Reader<C> {

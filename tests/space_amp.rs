@@ -11,7 +11,10 @@ fn worst_case_space_amp() -> value_log::Result<()> {
 
     let index = MockIndex::default();
 
-    let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher))?;
+    let value_log = ValueLog::open(
+        vl_path,
+        Config::<_, _, NoCompressor>::new(NoCacher, NoCacher),
+    )?;
 
     assert_eq!(0.0, value_log.space_amp());
     assert_eq!(0.0, value_log.manifest.stale_ratio());
@@ -51,7 +54,10 @@ fn no_overlap_space_amp() -> value_log::Result<()> {
 
     let index = MockIndex::default();
 
-    let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher))?;
+    let value_log = ValueLog::open(
+        vl_path,
+        Config::<_, _, NoCompressor>::new(NoCacher, NoCacher),
+    )?;
 
     assert_eq!(0.0, value_log.manifest.stale_ratio());
     assert_eq!(0.0, value_log.space_amp());

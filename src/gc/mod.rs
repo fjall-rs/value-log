@@ -4,13 +4,13 @@
 
 pub mod report;
 
-use crate::{id::SegmentId, BlobCache, Compressor, ValueLog};
+use crate::{id::SegmentId, BlobCache, Compressor, FDCache, ValueLog};
 
 /// GC strategy
 #[allow(clippy::module_name_repetitions)]
-pub trait GcStrategy<BC: BlobCache, C: Compressor + Clone> {
+pub trait GcStrategy<BC: BlobCache, FD: FDCache, C: Compressor + Clone> {
     /// Picks segments based on a predicate.
-    fn pick(&self, value_log: &ValueLog<BC, C>) -> Vec<SegmentId>;
+    fn pick(&self, value_log: &ValueLog<BC, FD, C>) -> Vec<SegmentId>;
 }
 
 /// Picks segments that have a certain percentage of stale blobs
@@ -32,8 +32,10 @@ impl StaleThresholdStrategy {
     }
 }
 
-impl<BC: BlobCache, C: Compressor + Clone> GcStrategy<BC, C> for StaleThresholdStrategy {
-    fn pick(&self, value_log: &ValueLog<BC, C>) -> Vec<SegmentId> {
+impl<BC: BlobCache, FDC: FDCache, C: Compressor + Clone> GcStrategy<BC, FDC, C>
+    for StaleThresholdStrategy
+{
+    fn pick(&self, value_log: &ValueLog<BC, FDC, C>) -> Vec<SegmentId> {
         value_log
             .manifest
             .segments
@@ -62,9 +64,11 @@ impl SpaceAmpStrategy {
     }
 }
 
-impl<BC: BlobCache, C: Compressor + Clone> GcStrategy<BC, C> for SpaceAmpStrategy {
+impl<BC: BlobCache, FDC: FDCache, C: Compressor + Clone> GcStrategy<BC, FDC, C>
+    for SpaceAmpStrategy
+{
     #[allow(clippy::cast_precision_loss, clippy::significant_drop_tightening)]
-    fn pick(&self, value_log: &ValueLog<BC, C>) -> Vec<SegmentId> {
+    fn pick(&self, value_log: &ValueLog<BC, FDC, C>) -> Vec<SegmentId> {
         let space_amp_target = self.0;
         let current_space_amp = value_log.space_amp();
 

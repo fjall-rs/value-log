@@ -17,7 +17,10 @@ fn accidental_drop_rc() -> value_log::Result<()> {
 
     let index = MockIndex::default();
 
-    let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher))?;
+    let value_log = ValueLog::open(
+        vl_path,
+        Config::<_, _, NoCompressor>::new(NoCacher, NoCacher),
+    )?;
 
     for key in ["a", "b"] {
         let value = &key;

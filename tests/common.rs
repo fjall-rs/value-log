@@ -3,11 +3,16 @@
 // (found in the LICENSE-* files in the repository)
 
 use std::{
-    collections::BTreeMap,
-    sync::{Arc, RwLock},
+    cell::RefCell,
+    collections::{BTreeMap, HashMap},
+    fs::File,
+    io::BufReader,
+    ops::Add,
+    sync::{Arc, Mutex, RwLock},
 };
 use value_log::{
-    BlobCache, Compressor, IndexReader, IndexWriter, UserKey, UserValue, ValueHandle, ValueLogId,
+    BlobCache, BlobFileId, Compressor, FDCache, IndexReader, IndexWriter, UserKey, UserValue,
+    ValueHandle, ValueLogId,
 };
 
 type MockIndexInner = RwLock<BTreeMap<UserKey, (ValueHandle, u32)>>;
@@ -89,4 +94,51 @@ impl BlobCache for NoCacher {
     }
 
     fn insert(&self, _: ValueLogId, _: &ValueHandle, _: UserValue) {}
+}
+
+impl FDCache for NoCacher {
+    fn get(&self, _: ValueLogId, _: BlobFileId) -> Option<BufReader<File>> {
+        None
+    }
+    fn insert(&self, _: ValueLogId, _: BlobFileId, _: BufReader<File>) {}
+}
+
+#[derive(Clone, Default)]
+pub struct InMemCacher {
+    fd_cache: Arc<Mutex<HashMap<(ValueLogId, BlobFileId), File>>>,
+    fd_hit_count: Arc<RefCell<u32>>,
+    fd_miss_count: Arc<RefCell<u32>>,
+}
+impl InMemCacher {
+    pub(crate) fn get_hit_count(&self) -> u32 {
+        *self.fd_hit_count.borrow()
+    }
+
+    pub(crate) fn get_miss_count(&self) -> u32 {
+        *self.fd_miss_count.borrow()
+    }
+}
+
+impl FDCache for InMemCacher {
+    fn get(&self, vlog_id: ValueLogId, blob_file_id: BlobFileId) -> Option<BufReader<File>> {
+        let lock = self.fd_cache.lock().unwrap();
+        let fd = match lock.get(&(vlog_id, blob_file_id)) {
+            Some(fd) => fd,
+            None => {
+                *self.fd_miss_count.borrow_mut() += 1;
+                return None;
+            }
+        };
+
+        let fd_clone = fd.try_clone().unwrap();
+        *self.fd_hit_count.borrow_mut() += 1;
+        Some(BufReader::new(fd_clone))
+    }
+
+    fn insert(&self, vlog_id: ValueLogId, blob_file_id: BlobFileId, fd: BufReader<File>) {
+        self.fd_cache
+            .lock()
+            .unwrap()
+            .insert((vlog_id, blob_file_id), fd.into_inner());
+    }
 }
