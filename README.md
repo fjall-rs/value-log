@@ -13,6 +13,7 @@
 
 Generic value log implementation for key-value separated storage, inspired by RocksDB's BlobDB [[1]](#footnotes) and Titan [[2]](#footnotes) and implemented in safe, stable Rust.
 
+> [!NOTE]
 > This crate is intended as a building block for key-value separated storage.
 > You probably want to use https://github.com/fjall-rs/fjall instead.
 
@@ -43,7 +44,7 @@ Uses [`bytes`](https://github.com/tokio-rs/bytes) as the underlying `Slice` type
 
 ## Stable disk format
 
-The disk format is stable as of 1.0.0. Future breaking changes will result in a major version bump and a migration path.
+The disk format is stable as of 1.0.0.
 
 ## License
 
