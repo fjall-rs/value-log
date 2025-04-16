@@ -55,8 +55,8 @@ impl<C: Compressor + Clone> Reader<C> {
         }
     }
 
-    pub(crate) fn use_compression(mut self, compressor: C) -> Self {
-        self.compression = Some(compressor);
+    pub(crate) fn use_compression(mut self, compressor: Option<C>) -> Self {
+        self.compression = compressor;
         self
     }
 }
