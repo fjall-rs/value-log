@@ -13,7 +13,7 @@ pub struct Config<BC: BlobCache, C: Compressor + Clone> {
     pub(crate) blob_cache: BC,
 
     /// Compression to use
-    pub(crate) compression: C,
+    pub(crate) compression: Option<C>,
 }
 
 impl<BC: BlobCache, C: Compressor + Clone + Default> Config<BC, C> {
@@ -21,14 +21,14 @@ impl<BC: BlobCache, C: Compressor + Clone + Default> Config<BC, C> {
     pub fn new(blob_cache: BC) -> Self {
         Self {
             blob_cache,
-            compression: Default::default(),
+            compression: None,
             segment_size_bytes: 128 * 1_024 * 1_024,
         }
     }
 
     /// Sets the compression & decompression scheme.
     #[must_use]
-    pub fn compression(mut self, compressor: C) -> Self {
+    pub fn compression(mut self, compressor: Option<C>) -> Self {
         self.compression = compressor;
         self
     }
