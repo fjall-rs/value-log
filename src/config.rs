@@ -21,7 +21,7 @@ impl<BC: BlobCache, C: Compressor + Clone + Default> Config<BC, C> {
     pub fn new(blob_cache: BC) -> Self {
         Self {
             blob_cache,
-            compression: Default::default(),
+            compression: None,
             segment_size_bytes: 128 * 1_024 * 1_024,
         }
     }
