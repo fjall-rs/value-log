@@ -23,6 +23,19 @@ impl Slice {
         Self(Bytes::from_static(&[]))
     }
 
+    #[must_use]
+    #[doc(hidden)]
+    pub fn with_size(len: usize) -> Self {
+        let bytes = vec![0; len];
+        Self(Bytes::from(bytes))
+    }
+
+    #[must_use]
+    #[doc(hidden)]
+    pub fn with_size_unzeroed(len: usize) -> Self {
+        Self(Self::get_unzeroed_builder(len).freeze())
+    }
+
     fn get_unzeroed_builder(len: usize) -> BytesMut {
         // Use `with_capacity` & `set_len`` to avoid zeroing the buffer
         let mut builder = BytesMut::with_capacity(len);
@@ -63,9 +76,8 @@ impl Slice {
 
     #[must_use]
     #[doc(hidden)]
-    pub fn with_size(len: usize) -> Self {
-        let bytes = vec![0; len];
-        Self(Bytes::from(bytes))
+    pub fn get_mut(&mut self) -> Option<impl std::ops::DerefMut<Target = [u8]> + '_> {
+        self.0.clone().try_into_mut().ok()
     }
 
     /// Constructs a [`Slice`] from an I/O reader by pulling in `len` bytes.
