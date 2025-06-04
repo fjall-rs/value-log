@@ -96,7 +96,7 @@ impl KeyRange {
 
     /// Returns `true` if the ranges overlap partially or fully.
     #[must_use]
-    pub fn overlaps_with_bounds(&self, bounds: &(Bound<UserKey>, Bound<UserKey>)) -> bool {
+    pub fn overlaps_with_bounds(&self, bounds: &(Bound<&[u8]>, Bound<&[u8]>)) -> bool {
         let (lo, hi) = bounds;
         let (my_lo, my_hi) = self.as_tuple();
 
@@ -294,30 +294,21 @@ mod tests {
         #[test]
         fn inclusive() {
             let key_range = KeyRange(UserKey::from("key1"), UserKey::from("key5"));
-            let bounds = (
-                Included(UserKey::from("key1")),
-                Included(UserKey::from("key5")),
-            );
+            let bounds = (Included(b"key1" as &[u8]), Included(b"key5" as &[u8]));
             assert!(key_range.overlaps_with_bounds(&bounds));
         }
 
         #[test]
         fn exclusive() {
             let key_range = KeyRange(UserKey::from("key1"), UserKey::from("key5"));
-            let bounds = (
-                Excluded(UserKey::from("key0")),
-                Excluded(UserKey::from("key6")),
-            );
+            let bounds = (Excluded(b"key0" as &[u8]), Excluded(b"key6" as &[u8]));
             assert!(key_range.overlaps_with_bounds(&bounds));
         }
 
         #[test]
         fn no_overlap() {
             let key_range = KeyRange(UserKey::from("key1"), UserKey::from("key5"));
-            let bounds = (
-                Excluded(UserKey::from("key5")),
-                Excluded(UserKey::from("key6")),
-            );
+            let bounds = (Excluded(b"key5" as &[u8]), Excluded(b"key6" as &[u8]));
             assert!(!key_range.overlaps_with_bounds(&bounds));
         }
 
