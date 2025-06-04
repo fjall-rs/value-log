@@ -77,7 +77,11 @@ impl Slice {
     #[must_use]
     #[doc(hidden)]
     pub fn get_mut(&mut self) -> Option<impl std::ops::DerefMut<Target = [u8]> + '_> {
-        self.0.clone().try_into_mut().ok()
+        Some({
+            let mut m = BytesMut::new();
+            m.extend_from_slice(self);
+            m
+        })
     }
 
     /// Constructs a [`Slice`] from an I/O reader by pulling in `len` bytes.
