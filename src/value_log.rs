@@ -352,12 +352,32 @@ impl<BC: BlobCache, C: Compressor + Clone> ValueLog<BC, C> {
         if ids.is_empty() {
             log::trace!("No blob files to drop");
         } else {
-            log::info!("Dropping stale blob files: {ids:?}");
-            self.manifest.drop_segments(&ids)?;
+            // Hold this lock over fs operations to ensure that
+            // we do not drop segments while they are being read
+            let mut prev_segments = self.manifest.segments.write().expect("lock is poisoned");
+
+            // NOTE: Create a copy of the levels we can operate on
+            // without mutating the current level manifest
+            // If persisting to disk fails, this way the level manifest
+            // is unchanged
+            let mut working_copy = prev_segments.clone();
+
+            working_copy.retain(|x, _| !ids.contains(x));
+
+            let ids = working_copy.keys().copied().collect::<Vec<_>>();
+
+            SegmentManifest::<C>::write_to_disk(&self.path, &ids)?;
+            *prev_segments = working_copy;
+
+            log::trace!("Swapped vLog segment list to: {ids:?}");
 
             for segment in segments {
                 std::fs::remove_file(&segment.path)?;
             }
+
+            // NOTE: Lock needs to live until end of function because
+            // writing to disk needs to be exclusive
+            drop(prev_segments);
         }
 
         Ok(bytes_freed)

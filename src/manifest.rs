@@ -296,7 +296,10 @@ impl<C: Compressor + Clone> SegmentManifest<C> {
         Ok(())
     }
 
-    fn write_to_disk<P: AsRef<Path>>(path: P, segment_ids: &[SegmentId]) -> crate::Result<()> {
+    pub(crate) fn write_to_disk<P: AsRef<Path>>(
+        path: P,
+        segment_ids: &[SegmentId],
+    ) -> crate::Result<()> {
         let path = path.as_ref();
         log::trace!("Writing segment manifest to {}", path.display());
 
