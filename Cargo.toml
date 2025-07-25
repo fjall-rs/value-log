@@ -35,7 +35,7 @@ xxhash-rust = { version = "0.8.12", features = ["xxh3"] }
 varint-rs = "2.2.0"
 
 [dev-dependencies]
-criterion = "0.5.1"
+criterion = "0.7.0"
 rand = "0.9.0"
 test-log = "0.2.16"
 lz4_flex = { version = "0.11.3" }
