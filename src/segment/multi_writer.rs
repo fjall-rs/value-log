@@ -53,9 +53,9 @@ impl<C: Compressor + Clone> MultiWriter<C> {
     /// Sets the compression method
     #[must_use]
     #[doc(hidden)]
-    pub fn use_compression(mut self, compressor: C) -> Self {
-        self.compression = Some(compressor.clone());
-        self.get_active_writer_mut().compression = Some(compressor);
+    pub fn use_compression(mut self, compressor: Option<C>) -> Self {
+        self.compression.clone_from(&compressor);
+        self.get_active_writer_mut().compression = compressor;
         self
     }
 
