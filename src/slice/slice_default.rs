@@ -23,6 +23,18 @@ impl Slice {
         Self(ByteView::new(&[]))
     }
 
+    #[must_use]
+    #[doc(hidden)]
+    pub fn with_size(len: usize) -> Self {
+        Self(ByteView::with_size(len))
+    }
+
+    #[must_use]
+    #[doc(hidden)]
+    pub fn with_size_unzeroed(len: usize) -> Self {
+        Self(ByteView::with_size_unzeroed(len))
+    }
+
     #[doc(hidden)]
     #[must_use]
     pub fn slice(&self, range: impl std::ops::RangeBounds<usize>) -> Self {
@@ -35,11 +47,10 @@ impl Slice {
         Self(ByteView::fused(left, right))
     }
 
-    // TODO: change to unzeroed and provide a _zeroed method instead
     #[must_use]
     #[doc(hidden)]
-    pub fn with_size(len: usize) -> Self {
-        Self(ByteView::with_size(len))
+    pub fn get_mut(&mut self) -> Option<impl std::ops::DerefMut<Target = [u8]> + '_> {
+        self.0.get_mut()
     }
 
     /// Constructs a [`Slice`] from an I/O reader by pulling in `len` bytes.

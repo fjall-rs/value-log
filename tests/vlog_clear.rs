@@ -27,7 +27,10 @@ fn vlog_clear() -> value_log::Result<()> {
     let items = ["a", "b", "c", "d", "e"];
 
     {
-        let value_log = ValueLog::open(vl_path, Config::<NoCacher, NoCompressor>::new(NoCacher))?;
+        let value_log = ValueLog::open(
+            vl_path,
+            Config::<NoCacher, _, NoCompressor>::new(NoCacher, NoCacher),
+        )?;
 
         for _ in 0..5 {
             let mut index_writer = MockIndexWriter(index.clone());
@@ -58,7 +61,10 @@ fn vlog_clear() -> value_log::Result<()> {
     }
 
     {
-        let value_log = ValueLog::open(vl_path, Config::<NoCacher, NoCompressor>::new(NoCacher))?;
+        let value_log = ValueLog::open(
+            vl_path,
+            Config::<NoCacher, _, NoCompressor>::new(NoCacher, NoCacher),
+        )?;
 
         value_log.scan_for_stats(index.read().unwrap().values().cloned().map(Ok))?;
 
