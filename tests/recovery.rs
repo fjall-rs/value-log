@@ -14,7 +14,10 @@ fn basic_recovery() -> value_log::Result<()> {
     let items = ["a", "b", "c", "d", "e"];
 
     {
-        let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher))?;
+        let value_log = ValueLog::open(
+            vl_path,
+            Config::<_, _, NoCompressor>::new(NoCacher, NoCacher),
+        )?;
 
         {
             let mut index_writer = MockIndexWriter(index.clone());
@@ -51,7 +54,10 @@ fn basic_recovery() -> value_log::Result<()> {
     }
 
     {
-        let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher))?;
+        let value_log = ValueLog::open(
+            vl_path,
+            Config::<_, _, NoCompressor>::new(NoCacher, NoCacher),
+        )?;
 
         value_log.scan_for_stats(index.read().unwrap().values().cloned().map(Ok))?;
 
@@ -79,7 +85,10 @@ fn recovery_delete_unfinished() -> value_log::Result<()> {
     let vl_path = folder.path();
 
     {
-        let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher))?;
+        let value_log = ValueLog::open(
+            vl_path,
+            Config::<_, _, NoCompressor>::new(NoCacher, NoCacher),
+        )?;
 
         let mut writer = value_log.get_writer()?;
         writer.write("a", "a")?;
@@ -93,7 +102,10 @@ fn recovery_delete_unfinished() -> value_log::Result<()> {
     }
 
     {
-        let value_log = ValueLog::open(vl_path, Config::<_, NoCompressor>::new(NoCacher))?;
+        let value_log = ValueLog::open(
+            vl_path,
+            Config::<_, _, NoCompressor>::new(NoCacher, NoCacher),
+        )?;
         assert_eq!(1, value_log.segment_count());
     }
 
